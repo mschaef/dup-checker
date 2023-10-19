@@ -18,12 +18,13 @@
       (log/info (file-info f)))))
 
 (defn- db-conn-spec [ config ]
+  ;; TODO: Much of this logic should somehow go in playbook
   {:name (or (config-property "db.subname")
              (get-in config [:db :subname] "dup-checker"))
    :schema-path [ "sql/" ]
    :schemas [[ "dup-checker" 0 ]]})
 
-(defn -main [& args]
+(defn -main [& args] ;; TODO: Does playbook need a standard main? Or wrapper?
   (let [config (-> (config/load-config)
                    (assoc :log-levels
                           [[#{"hsqldb.*" "com.zaxxer.hikari.*"} :warn]
