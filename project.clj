@@ -4,11 +4,14 @@
             :url "https://www.eclipse.org/legal/epl-2.0/"}
 
   :dependencies [[org.clojure/clojure "1.11.1"]
-                 [org.clj-commons/digest "1.4.100"]] 
+                 [org.clj-commons/digest "1.4.100"]
+                 [com.mschaef/sql-file "0.4.8"]
+                 [com.mschaef/playbook "0.0.10"]]
 
   :repl-options {:init-ns dup-checker.core}
 
   :main dup-checker.core
+  :jvm-opts ["-Dconf=local-config.edn"]
 
   :jar-name "dup-checker.jar"
   :uberjar-name "dup-checker-standalone.jar")

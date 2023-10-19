@@ -1,0 +1,2 @@
+{:app {:name "Dup Checker"}
+ :db {:subname "dup-checker"}}

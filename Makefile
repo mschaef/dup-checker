@@ -18,4 +18,4 @@ package:
 
 .PHONY: clean-data
 clean-data:
-	rm -rfv local-db/toto.*
+	rm -rfv local-db/dup-checker.*
