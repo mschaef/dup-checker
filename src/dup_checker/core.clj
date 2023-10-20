@@ -39,10 +39,19 @@
                      :md5_digest (:md5-digest file-info)
                      :sha256_digest (:sha256-digest file-info)}))))
 
-(defn- list-files [ db-conn root-path ]
+(defn- catalog-fs-files [ db-conn root-path ]
   (let [root (clojure.java.io/file root-path)]
     (doseq [f (filter #(.isFile %) (file-seq root))]
       (catalog-file db-conn (file-info root f)))))
+
+(defn- show-file-report [ db-conn  ]
+  (doseq [ file-rec (query-all db-conn
+                               [(str "SELECT md5_digest, name"
+                                     "  FROM file"
+                                     " ORDER BY md5_digest")])]
+    (println (:md5_digest file-rec) " " (:name file-rec))
+    )
+  )
 
 (defn- db-conn-spec [ config ]
   ;; TODO: Much of this logic should somehow go in playbook
@@ -51,6 +60,18 @@
    :schema-path [ "sql/" ]
    :schemas [[ "dup-checker" 0 ]]})
 
+(defn- fail [ message ]
+  (throw (RuntimeException. message)))
+
+(defn- dispatch-subcommand [ db-conn args ]
+  (if (= (count args) 0)
+    (fail "Insufficient arguments.")
+    (let [ [ subcommand & args ] args]
+      (case subcommand
+        "catalog" (catalog-fs-files db-conn ".")
+        "show" (show-file-report db-conn)
+        (fail "Unknown subcommand")))))
+
 (defn -main [& args] ;; TODO: Does playbook need a standard main? Or wrapper?
   (let [config (-> (config/load-config)
                    (assoc :log-levels
@@ -58,6 +79,7 @@
                            [#{"dup-checker.*"} :info]]))]
     (logging/setup-logging config)
     (log/info "Starting App" (:app config))
+
     (sql-file/with-pool [db-conn (db-conn-spec config)]
-      (list-files db-conn "."))
+      (dispatch-subcommand db-conn args))
     (log/info "end run.")))
