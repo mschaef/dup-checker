@@ -12,9 +12,12 @@
   (let [path (.getCanonicalPath f)]
     {:full-path path
      :name (.substring path (+ 1 (count (.getCanonicalPath root))))
-     :size (.length f)
-     :md5-digest (digest/md5 f)
-     :sha256-digest (digest/sha256 f)}))
+     :size (.length f)}))
+
+(defn- compute-file-digests [ file-info ]
+  (merge file-info
+         {:md5-digest (digest/md5 (:full-path file-info))
+          :sha256-digest (digest/sha256 (:full-path file-info))}))
 
 (defn- file-cataloged? [ db-conn file-info ]
   (> (query-scalar db-conn
@@ -27,7 +30,7 @@
 (defn- catalog-file [ db-conn file-info ]
   (if (file-cataloged? db-conn file-info)
     (log/info "File already cataloged:" (:name file-info))
-    (do
+    (let [ file-info (compute-file-digests file-info )]
       (log/info "Adding file to catalog:" (:name file-info))
       (jdbc/insert! db-conn
                     :file
