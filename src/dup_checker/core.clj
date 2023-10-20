@@ -6,16 +6,18 @@
             [playbook.config :as config]
             [taoensso.timbre :as log]))
 
-(defn- file-info [ f ]
-  {:name (.getAbsolutePath f)
-   :size (.length f)
-   :md5-digest (digest/md5 f)
-   :sha256-digest (digest/sha256 f)})
+(defn- file-info [ root f ]
+  (let [path (.getCanonicalPath f)]
+    {:full-path path
+     :name (.substring path (+ 1 (count (.getCanonicalPath root))))
+     :size (.length f)
+     :md5-digest (digest/md5 f)
+     :sha256-digest (digest/sha256 f)}))
 
-(defn- list-files [ db-conn ]
-  (let [root (clojure.java.io/file ".")]
+(defn- list-files [ db-conn root-path ]
+  (let [root (clojure.java.io/file root-path)]
     (doseq [f (filter #(.isFile %) (file-seq root))]
-      (log/info (file-info f)))))
+      (log/info (file-info root f)))))
 
 (defn- db-conn-spec [ config ]
   ;; TODO: Much of this logic should somehow go in playbook
@@ -32,5 +34,5 @@
     (logging/setup-logging config)
     (log/info "Starting App" (:app config))
     (sql-file/with-pool [db-conn (db-conn-spec config)]
-      (list-files db-conn))
+      (list-files db-conn "."))
     (log/info "end run.")))
