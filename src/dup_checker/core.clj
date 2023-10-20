@@ -46,12 +46,10 @@
 
 (defn- show-file-report [ db-conn  ]
   (doseq [ file-rec (query-all db-conn
-                               [(str "SELECT md5_digest, name"
+                               [(str "SELECT md5_digest, name, size"
                                      "  FROM file"
                                      " ORDER BY md5_digest")])]
-    (println (:md5_digest file-rec) " " (:name file-rec))
-    )
-  )
+    (println (:md5_digest file-rec) " " (:name file-rec) "(" (:size file-rec) ")")))
 
 (defn- db-conn-spec [ config ]
   ;; TODO: Much of this logic should somehow go in playbook
@@ -68,7 +66,7 @@
     (fail "Insufficient arguments.")
     (let [ [ subcommand & args ] args]
       (case subcommand
-        "catalog" (catalog-fs-files db-conn ".")
+        "catalog" (catalog-fs-files db-conn (or (first args) "."))
         "show" (show-file-report db-conn)
         (fail "Unknown subcommand")))))
 
