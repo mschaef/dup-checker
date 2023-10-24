@@ -100,17 +100,11 @@
                                   catalog-id])]
       (println (:md5_digest file-rec) " " (:name file-rec) "(" (:size file-rec) ")"))))
 
-(defn- db-conn-spec [ config ]
-  ;; TODO: Much of this logic should somehow go in playbook
-  {:name (or (config-property "db.subname")
-             (get-in config [:db :subname] "dup-checker"))
-   :schema-path [ "sql/" ]
-   :schemas [[ "dup-checker" 0 ]]})
-
 (defn- dispatch-subcommand [ db-conn args ]
   (if (= (count args) 0)
     (fail "Insufficient arguments.")
-    (let [ [ subcommand & args ] args]
+    (let [ [ subcommand & args ] args ]
+
       (case subcommand
         "catalog" (catalog-fs-files db-conn
                                     (or (second args) "default")
@@ -118,14 +112,33 @@
         "show" (show-file-report db-conn (or (first args) "default"))
         (fail "Unknown subcommand")))))
 
-(defn -main [& args] ;; TODO: Does playbook need a standard main? Or wrapper?
-  (let [config (-> (config/load-config)
-                   (assoc :log-levels
-                          [[#{"hsqldb.*" "com.zaxxer.hikari.*"} :warn]
-                           [#{"dup-checker.*"} :info]]))]
-    (logging/setup-logging config)
-    (log/info "Starting App" (:app config))
+(defn- app-main
+  ([ entry args config-overrides ]
+   (let [config (-> (config/load-config)
+                    (merge config-overrides))]
+     (logging/setup-logging config)
+     (log/info "Starting App" (:app config))
+     (with-exception-barrier :app-entry
+       (entry config args))
+     (log/info "end run.")))
 
-    (sql-file/with-pool [db-conn (db-conn-spec config)]
-      (dispatch-subcommand db-conn args))
-    (log/info "end run.")))
+  ([ entry args ]
+   (app-main entry {:log-levels
+                    [[#{"hsqldb.*" "com.zaxxer.hikari.*"} :warn]]})))
+
+(defn- db-conn-spec [ config ]
+  ;; TODO: Much of this logic should somehow go in playbook
+  {:name (or (config-property "db.subname")
+             (get-in config [:db :subname] "dup-checker"))
+   :schema-path [ "sql/" ]
+   :schemas [[ "dup-checker" 0 ]]})
+
+(defn -main [& args] ;; TODO: Does playbook need a standard main? Or wrapper?
+  (app-main
+   (fn [ config args ]
+     (sql-file/with-pool [db-conn (db-conn-spec config)]
+       (dispatch-subcommand db-conn args)))
+   args
+   {:log-levels
+    [[#{"hsqldb.*" "com.zaxxer.hikari.*"} :warn]
+     [#{"dup-checker.*"} :info]]}))
