@@ -41,8 +41,15 @@
                     catalog-id])
      0))
 
-(defn- catalog-file [ db-conn catalog-id file-info ]
-  (if (file-cataloged? db-conn catalog-id file-info)
+(defn- get-catalog-files [ db-conn catalog-id ]
+  (set (map :name (query-all db-conn
+                             [(str "SELECT name"
+                                   "  FROM file"
+                                   " WHERE file.catalog_id = ?")
+                              catalog-id]))))
+
+(defn- catalog-file [ db-conn catalog-files catalog-id file-info ]
+  (if (catalog-files (:name file-info))
     (log/info "File already cataloged:" (:name file-info))
     (let [ file-info (compute-file-digests file-info )]
       (log/info "Adding file to catalog:" (:name file-info))
@@ -84,9 +91,10 @@
 
 (defn- catalog-fs-files [ db-conn catalog-name root-path ]
   (let [catalog-id (ensure-catalog db-conn catalog-name)
-        root (clojure.java.io/file root-path)]
+        root (clojure.java.io/file root-path)
+        catalog-files (get-catalog-files db-conn catalog-id)]
     (doseq [f (filter #(.isFile %) (file-seq root))]
-      (catalog-file db-conn catalog-id (file-info root f)))))
+      (catalog-file db-conn catalog-files catalog-id (file-info root f)))))
 
 (defn- show-file-report [ db-conn catalog-name ]
   (let [catalog-id (or (get-catalog-id db-conn catalog-name)
