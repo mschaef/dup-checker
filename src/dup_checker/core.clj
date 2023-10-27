@@ -21,7 +21,8 @@
 
 (defn- file-info [ root f ]
   (let [path (.getCanonicalPath f)]
-    {:full-path path
+    {:file f
+     :full-path path
      :extension (get-file-extension f)
      :last-modified-on (java.util.Date. (.lastModified f))
      :name (.substring path (+ 1 (count (.getCanonicalPath root))))
@@ -29,8 +30,10 @@
 
 (defn- compute-file-digests [ file-info ]
   (merge file-info
-         {:md5-digest (digest/md5 (:full-path file-info))
-          :sha256-digest (digest/sha256 (:full-path file-info))}))
+         {:md5-digest (digest/md5 (:file file-info))
+          ;:sha256-digest (digest/sha256 (:file file-info))
+          :sha256-digest ""
+          }))
 
 (defn- file-cataloged? [ db-conn catalog-id file-info ]
   (> (query-scalar db-conn
