@@ -126,6 +126,20 @@
                            " ORDER BY md5_digest")
                       catalog-id])))))
 
+(defn- cmd-list-dups [ db-conn ]
+  (let [ result-set (query-all db-conn
+                               [(str "SELECT md5_digest, count(md5_digest) as count"
+                                     "  FROM file"
+                                     " GROUP BY md5_digest"
+                                     " ORDER BY count")])]
+    (pprint/print-table
+     (map (fn [ file-rec ]
+            {:md5-digest (:md5_digest file-rec)
+             :count (:count file-rec)})
+          result-set))
+
+    (println "n=" (count result-set))))
+
 (defn- db-conn-spec [ config ]
   ;; TODO: Much of this logic should somehow go in playbook
   {:name (or (config-property "db.subname")
@@ -143,6 +157,7 @@
                                     (or (second args) "default")
                                     (or (first args) "."))
         "list" (cmd-list-catalog-files db-conn (or (first args) "default"))
+        "list-dups" (cmd-list-dups db-conn)
         (fail "Unknown subcommand")))))
 
 (defn -main [& args] ;; TODO: Does playbook need a standard main? Or wrapper?
