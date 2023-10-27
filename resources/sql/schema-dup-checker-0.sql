@@ -13,6 +13,5 @@ CREATE CACHED TABLE file (
   size BIGINT NOT NULL,
   last_modified_on TIMESTAMP NOT NULL,
   md5_digest VARCHAR(128) NOT NULL,
-  sha256_digest VARCHAR(128) NULL
 );
 

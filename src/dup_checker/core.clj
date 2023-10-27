@@ -30,10 +30,8 @@
 
 (defn- compute-file-digests [ file-info ]
   (merge file-info
-         {:md5-digest (digest/md5 (:file file-info))
-          ;:sha256-digest (digest/sha256 (:file file-info))
-          :sha256-digest ""
-          }))
+         ;;; MD5 only, because that's all the S3 API supports.
+         {:md5-digest (digest/md5 (:file file-info))}))
 
 (defn- file-cataloged? [ db-conn catalog-id file-info ]
   (> (query-scalar db-conn
@@ -77,8 +75,7 @@
                      :extension (:extension file-info)
                      :size (:size file-info)
                      :last_modified_on (:last-modified-on file-info)
-                     :md5_digest (:md5-digest file-info)
-                     :sha256_digest (:sha256-digest file-info)}))))
+                     :md5_digest (:md5-digest file-info)}))))
 
 (defn- get-catalog-id [ db-conn catalog-name ]
   (query-scalar db-conn
