@@ -96,6 +96,15 @@
     (doseq [f (filter #(.isFile %) (file-seq root))]
       (catalog-file db-conn catalog-files catalog-id (file-info root f)))))
 
+(defn- list-catalogs [ db-conn]
+  (doseq [ catalog-rec (query-all db-conn
+                               [(str "SELECT catalog.name, catalog.updated_on, count(file_id) as size"
+                                     "  FROM catalog, file"
+                                     " WHERE catalog.catalog_id = file.catalog_id"
+                                     " GROUP BY catalog.name, catalog.updated_on"
+                                     " ORDER BY name")])]
+      (println (:name catalog-rec) " " (:size catalog-rec) " " (:updated_on catalog-rec))))
+
 (defn- show-file-report [ db-conn catalog-name ]
   (let [catalog-id (or (get-catalog-id db-conn catalog-name)
                        (fail (str "No known catalog: " catalog-name)))]
@@ -120,6 +129,7 @@
     (fail "Insufficient arguments.")
     (let [ [ subcommand & args ] args]
       (case subcommand
+        "lsc" (list-catalogs db-conn)
         "catalog" (catalog-fs-files db-conn
                                     (or (second args) "default")
                                     (or (first args) "."))
