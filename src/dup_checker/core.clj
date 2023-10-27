@@ -52,9 +52,22 @@
                                    " WHERE file.catalog_id = ?")
                               catalog-id]))))
 
+(def image-extensions
+  #{"vob" "m4p" "wmv" "xbm" "tar" "gz" "lrcat" "pcx"
+    "dng" "rtf" "fig" "psd" "jpeg" "hdr" "mpeg" "mpg" "xmp"
+    "wma" "xpm" "moi" "mom" "sbr" "mov" "dvi" "tga" "tgz"
+    "zip" "svg" "tsp" "mod" "avi" "mp4" "xcf" "tif" "bmp"
+    "mp3" "pdf" "arw" "ithmb" "gif" "nef" "png" "jpg"})
+
 (defn- catalog-file [ db-conn catalog-files catalog-id file-info ]
-  (if (catalog-files (:name file-info))
+  (cond
+    (catalog-files (:name file-info))
     (log/info "File already cataloged:" (:name file-info))
+
+    (not (image-extensions (.toLowerCase (:extension file-info))))
+    (log/info "Skipping non-image file:" (:name file-info))
+
+    :else
     (let [ file-info (compute-file-digests file-info )]
       (log/info "Adding file to catalog:" (:name file-info))
       (jdbc/insert! db-conn
