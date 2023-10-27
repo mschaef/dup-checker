@@ -1,7 +1,8 @@
 (ns dup-checker.core
   (:use playbook.core
         sql-file.sql-util)
-  (:require [clj-commons.digest :as digest]
+  (:require [clojure.pprint :as pprint]
+            [clj-commons.digest :as digest]
             [sql-file.core :as sql-file]
             [playbook.logging :as logging]
             [playbook.config :as config]
@@ -97,25 +98,33 @@
       (catalog-file db-conn catalog-files catalog-id (file-info root f)))))
 
 (defn- list-catalogs [ db-conn]
-  (doseq [ catalog-rec (query-all db-conn
-                               [(str "SELECT catalog.name, catalog.updated_on, count(file_id) as size"
-                                     "  FROM catalog, file"
-                                     " WHERE catalog.catalog_id = file.catalog_id"
-                                     " GROUP BY catalog.name, catalog.updated_on"
-                                     " ORDER BY name")])]
-      (println (:name catalog-rec) " " (:size catalog-rec) " " (:updated_on catalog-rec))))
+  (pprint/print-table
+   (map (fn [ catalog-rec ]
+          {:n (:n catalog-rec)
+           :name (:name catalog-rec)
+           :size (:size catalog-rec)
+           :updated-on (:updated_on catalog-rec)})
+        (query-all db-conn
+                   [(str "SELECT catalog.name, catalog.updated_on, count(file_id) as n, sum(file.size) as size"
+                         "  FROM catalog, file"
+                         " WHERE catalog.catalog_id = file.catalog_id"
+                         " GROUP BY catalog.name, catalog.updated_on"
+                         " ORDER BY name")]))))
 
 (defn- show-file-report [ db-conn catalog-name ]
-  (let [catalog-id (or (get-catalog-id db-conn catalog-name)
-                       (fail (str "No known catalog: " catalog-name)))]
-
-    (doseq [ file-rec (query-all db-conn
-                                 [(str "SELECT md5_digest, name, size"
-                                       "  FROM file"
-                                       " WHERE catalog_id=?"
-                                       " ORDER BY md5_digest")
-                                  catalog-id])]
-      (println (:md5_digest file-rec) " " (:name file-rec) "(" (:size file-rec) ")"))))
+  (pprint/print-table
+   (map (fn [ file-rec ]
+          {:md5-digest (:md5_digest file-rec)
+           :name (:name file-rec)
+           :size (:size file-rec)})
+        (let [catalog-id (or (get-catalog-id db-conn catalog-name)
+                             (fail (str "No known catalog: " catalog-name)))]
+          (query-all db-conn
+                     [(str "SELECT md5_digest, name, size"
+                           "  FROM file"
+                           " WHERE catalog_id=?"
+                           " ORDER BY md5_digest")
+                      catalog-id])))))
 
 (defn- db-conn-spec [ config ]
   ;; TODO: Much of this logic should somehow go in playbook
