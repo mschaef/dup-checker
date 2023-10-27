@@ -90,14 +90,14 @@
     (update-catalog-date db-conn existing-catalog-id)
     (create-catalog db-conn catalog-name)))
 
-(defn- catalog-fs-files [ db-conn catalog-name root-path ]
+(defn- cmd-catalog-fs-files [ db-conn catalog-name root-path ]
   (let [catalog-id (ensure-catalog db-conn catalog-name)
         root (clojure.java.io/file root-path)
         catalog-files (get-catalog-files db-conn catalog-id)]
     (doseq [f (filter #(.isFile %) (file-seq root))]
       (catalog-file db-conn catalog-files catalog-id (file-info root f)))))
 
-(defn- list-catalogs [ db-conn]
+(defn- cmd-list-catalogs [ db-conn]
   (pprint/print-table
    (map (fn [ catalog-rec ]
           {:n (:n catalog-rec)
@@ -111,7 +111,7 @@
                          " GROUP BY catalog.name, catalog.updated_on"
                          " ORDER BY name")]))))
 
-(defn- show-file-report [ db-conn catalog-name ]
+(defn- cmd-list-catalog-files [ db-conn catalog-name ]
   (pprint/print-table
    (map (fn [ file-rec ]
           {:md5-digest (:md5_digest file-rec)
@@ -138,11 +138,11 @@
     (fail "Insufficient arguments.")
     (let [ [ subcommand & args ] args]
       (case subcommand
-        "lsc" (list-catalogs db-conn)
-        "catalog" (catalog-fs-files db-conn
+        "lsc" (cmd-list-catalogs db-conn)
+        "catalog" (cmd-catalog-fs-files db-conn
                                     (or (second args) "default")
                                     (or (first args) "."))
-        "show" (show-file-report db-conn (or (first args) "default"))
+        "list" (cmd-list-catalog-files db-conn (or (first args) "default"))
         (fail "Unknown subcommand")))))
 
 (defn -main [& args] ;; TODO: Does playbook need a standard main? Or wrapper?
