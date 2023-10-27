@@ -72,7 +72,7 @@
                     :file
                     {:name (:name file-info)
                      :catalog_id catalog-id
-                     :extension (:extension file-info)
+                     :extension (.toLowerCase (:extension file-info))
                      :size (:size file-info)
                      :last_modified_on (:last-modified-on file-info)
                      :md5_digest (:md5-digest file-info)}))))
@@ -90,21 +90,26 @@
                 ["catalog_id=?" existing-catalog-id])
   existing-catalog-id)
 
-(defn- create-catalog [ db-conn catalog-name ]
+(defn- current-hostname []
+  (.getCanonicalHostName (java.net.InetAddress/getLocalHost)))
+
+(defn- create-catalog [ db-conn catalog-name root-path ]
   (:catalog_id (first
                 (jdbc/insert! db-conn
                               :catalog
                               {:name catalog-name
                                :created_on (java.util.Date.)
-                               :updated_on (java.util.Date.)}))))
+                               :updated_on (java.util.Date.)
+                               :root_path root-path
+                               :hostname (current-hostname)}))))
 
-(defn- ensure-catalog [ db-conn catalog-name ]
+(defn- ensure-catalog [ db-conn catalog-name root-path ]
   (if-let [ existing-catalog-id (get-catalog-id db-conn catalog-name ) ]
     (update-catalog-date db-conn existing-catalog-id)
-    (create-catalog db-conn catalog-name)))
+    (create-catalog db-conn catalog-name root-path)))
 
 (defn- cmd-catalog-fs-files [ db-conn catalog-name root-path ]
-  (let [catalog-id (ensure-catalog db-conn catalog-name)
+  (let [catalog-id (ensure-catalog db-conn catalog-name root-path)
         root (clojure.java.io/file root-path)
         catalog-files (get-catalog-files db-conn catalog-id)]
     (doseq [f (filter #(.isFile %) (file-seq root))]
