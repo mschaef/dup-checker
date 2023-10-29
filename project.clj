@@ -6,6 +6,8 @@
   :dependencies [[org.clojure/clojure "1.11.1"]
                  [org.clj-commons/digest "1.4.100"]
                  [com.mschaef/sql-file "0.4.8"]
+                 [clj-http "3.12.3"
+                  :exclusions [com.fasterxml.jackson.core/jackson-core]]
                  ;; TODO: This brings in an awful lot for a CLI app.
                  [com.mschaef/playbook "0.0.10"]]
 

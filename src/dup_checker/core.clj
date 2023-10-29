@@ -7,10 +7,40 @@
             [playbook.logging :as logging]
             [playbook.config :as config]
             [taoensso.timbre :as log]
-            [clojure.java.jdbc :as jdbc]))
+            [clojure.java.jdbc :as jdbc]
+            [clj-http.client :as http]))
 
 (defn- fail [ message ]
   (throw (RuntimeException. message)))
+
+;;; Acquire token through Google OAuth playground
+;;;
+;;; https://developers.google.com/oauthplayground/
+;;; API Scope: https://www.googleapis.com/auth/photoslibrary.readonly
+
+(defn- http-request-json [ url ]
+  (let [response (http/get url
+                           {:headers
+                            {:Authorization (str "Bearer " (System/getenv "GPHOTO_TOKEN"))}})]
+    (and (= 200 (:status response))
+         (try-parse-json (:body response)))))
+
+
+(defn- get-gphoto-paged-stream [ url items-key ]
+  (letfn [(query-page [ page-token ]
+            (let [ response (http-request-json (str url (when page-token
+                                                          (str "?pageToken=" page-token))))]
+              (if-let [ next-page-token (:nextPageToken response)]
+                (lazy-seq (concat (items-key response)
+                                  (query-page next-page-token)))
+                (items-key response))))]
+    (query-page nil)))
+
+(defn- get-gphoto-albums [ ]
+  (get-gphoto-paged-stream "https://photoslibrary.googleapis.com/v1/albums" :albums))
+
+(defn- get-gphoto-media-items [ ]
+  (get-gphoto-paged-stream "https://photoslibrary.googleapis.com/v1/mediaItems" :mediaItems))
 
 (defn- get-file-extension [ f ]
   (let [name (.getName f)
@@ -158,12 +188,22 @@
 
     (println "n=" (count result-set))))
 
+(defn- cmd-list-gphoto-albums []
+  (doseq [ album (get-gphoto-albums) ]
+    (pprint/pprint album)))
+
+(defn- cmd-list-gphoto-media-items []
+  (doseq [ item (get-gphoto-media-items) ]
+    (pprint/pprint item)))
+
 (defn- dispatch-subcommand [ db-conn args ]
   (if (= (count args) 0)
     (fail "Insufficient arguments.")
     (let [ [ subcommand & args ] args ]
 
       (case subcommand
+        "lsgpa"  (cmd-list-gphoto-albums)
+        "lsgpm" (cmd-list-gphoto-media-items)
         "lsc" (cmd-list-catalogs db-conn)
         "catalog" (cmd-catalog-fs-files db-conn
                                     (or (second args) "default")
@@ -192,6 +232,7 @@
              (get-in config [:db :subname] "dup-checker"))
    :schema-path [ "sql/" ]
    :schemas [[ "dup-checker" 0 ]]})
+
 
 (defn -main [& args] ;; TODO: Does playbook need a standard main? Or wrapper?
   (app-main
