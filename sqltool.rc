@@ -1,0 +1,4 @@
+urlid local
+url jdbc:hsqldb:~/personal/dup-checker/local-db/dup-checker
+username sa
+password

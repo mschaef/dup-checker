@@ -1,8 +1,10 @@
 CREATE CACHED TABLE catalog (
   catalog_id BIGINT IDENTITY,
-  name varchar(32) UNIQUE,
+  name VARCHAR(32) UNIQUE,
   created_on TIMESTAMP NOT NULL,
-  updated_on TIMESTAMP NOT NULL
+  updated_on TIMESTAMP NOT NULL,
+  root_path VARCHAR(256) NOT NULL,
+  hostname VARCHAR(256) NOT NULL,
 );
 
 CREATE CACHED TABLE file (
@@ -13,6 +15,5 @@ CREATE CACHED TABLE file (
   size BIGINT NOT NULL,
   last_modified_on TIMESTAMP NOT NULL,
   md5_digest VARCHAR(128) NOT NULL,
-  sha256_digest VARCHAR(128) NULL
 );
 
