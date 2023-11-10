@@ -1,4 +1,5 @@
 (ns dup-checker.core
+  (:gen-class :main true)
   (:use playbook.core
         sql-file.sql-util)
   (:require [clojure.pprint :as pprint]

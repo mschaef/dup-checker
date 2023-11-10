@@ -13,6 +13,7 @@
   :repl-options {:init-ns dup-checker.core}
 
   :main dup-checker.core
+
   :jvm-opts ["-Dconf=local-config.edn"]
 
   :jar-name "dup-checker.jar"
