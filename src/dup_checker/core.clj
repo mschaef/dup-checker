@@ -8,7 +8,8 @@
             [playbook.config :as config]
             [taoensso.timbre :as log]
             [clojure.java.jdbc :as jdbc]
-            [clj-http.client :as http]))
+            [clj-http.client :as http]
+            [again.core :as again]))
 
 (defn- fail [ message ]
   (throw (RuntimeException. message)))
@@ -58,10 +59,15 @@
      :name (.substring path (+ 1 (count (.getCanonicalPath root))))
      :size (.length f)}))
 
+;; Times in msec
+(def retry-policy [ 0 5000 10000 15000 ])
+
 (defn- compute-file-digests [ file-info ]
   (merge file-info
          ;;; MD5 only, because that's all the S3 API supports.
-         {:md5-digest (digest/md5 (:file file-info))}))
+         {:md5-digest (again/with-retries retry-policy
+                        ;;; Retry to accomodate potential I/O errors.
+                        (digest/md5 (:file file-info)))}))
 
 (defn- file-cataloged? [ db-conn catalog-id file-info ]
   (> (query-scalar db-conn
