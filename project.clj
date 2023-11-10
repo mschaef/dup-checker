@@ -15,7 +15,17 @@
   :repl-options {:init-ns dup-checker.core}
 
   :main dup-checker.core
+
   :jvm-opts ["-Dconf=local-config.edn"]
 
   :jar-name "dup-checker.jar"
-  :uberjar-name "dup-checker-standalone.jar")
+  :uberjar-name "dup-checker-standalone.jar"
+
+  :release-tasks [["vcs" "assert-committed"]
+                  ["change" "version" "leiningen.release/bump-version" "release"]
+                  ["vcs" "commit"]
+                  ["vcs" "tag" "--no-sign"]
+                  ["uberjar"]
+                  ["change" "version" "leiningen.release/bump-version"]
+                  ["vcs" "commit"]
+                  ["vcs" "push"]])
