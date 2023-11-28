@@ -11,8 +11,8 @@
             [clojure.java.jdbc :as jdbc]
             [again.core :as again]))
 
-(defn- fail [ message ]
-  (throw (RuntimeException. message)))
+(defn- fail [ message & args ]
+  (throw (RuntimeException. (apply str message args))))
 
 (defn- get-file-extension [ f ]
   (let [name (.getName f)
@@ -143,7 +143,7 @@
            :name (:name file-rec)
            :size (:size file-rec)})
         (let [catalog-id (or (get-catalog-id db-conn catalog-name)
-                             (fail (str "No known catalog: " catalog-name)))]
+                             (fail "No known catalog: " catalog-name))]
           (query-all db-conn
                      [(str "SELECT md5_digest, name, size"
                            "  FROM file"
@@ -167,7 +167,7 @@
 
 (defn- dispatch-subcommand [ db-conn args ]
   (if (= (count args) 0)
-    (fail "Insufficient arguments.")
+    (fail "Insufficient arguments, missing subcommand.")
     (let [ [ subcommand & args ] args ]
 
       (case subcommand
@@ -177,7 +177,7 @@
                                     (or (first args) "."))
         "list" (cmd-list-catalog-files db-conn (or (first args) "default"))
         "list-dups" (cmd-list-dups db-conn)
-        (fail "Unknown subcommand")))))
+        (fail "Unknown subcommand: " subcommand)))))
 
 (defn- app-main
   ([ entry args config-overrides ]
