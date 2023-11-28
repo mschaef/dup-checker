@@ -18,6 +18,14 @@
     (println (str "Error: " full-message))
     (throw (RuntimeException. full-message))))
 
+(defn- table
+  ([ rows ]
+   (table (keys (first rows)) rows))
+
+  ([ ks rows ]
+   (pprint/print-table ks rows)
+   (println "n=" (count rows))))
+
 (defn- s3-client []
   (-> (software.amazon.awssdk.services.s3.S3Client/builder)
       (.region software.amazon.awssdk.regions.Region/US_EAST_1)
@@ -148,7 +156,7 @@
 (defn- cmd-list-catalogs
   "List all catalogs"
   [ ]
-  (pprint/print-table
+  (table
    (map (fn [ catalog-rec ]
           {:n (:n catalog-rec)
            :id (:catalog_id catalog-rec)
@@ -169,7 +177,7 @@
   "List all files present in a catalog."
   [ catalog-name ]
 
-  (pprint/print-table
+  (table
    (map (fn [ file-rec ]
           {:md5-digest (:md5_digest file-rec)
            :name (:name file-rec)
@@ -195,31 +203,29 @@
 (defn- cmd-list-dups
   "List all duplicate files by MD5 digest."
   [ ]
-  (let [ result-set (query-all (sfm/db)
-                               [(str "SELECT * FROM ("
-                                     "   SELECT md5_digest, count(md5_digest) as count"
-                                     "     FROM file"
-                                     "    GROUP BY md5_digest)"
-                                     " WHERE count > 1"
-                                     " ORDER BY count")])]
-    (pprint/print-table
-     (map (fn [ file-rec ]
-            {:md5-digest (:md5_digest file-rec)
-             :count (:count file-rec)})
-          result-set))
-    (println "n=" (count result-set))))
+
+  (table
+   (map (fn [ file-rec ]
+          {:md5-digest (:md5_digest file-rec)
+           :count (:count file-rec)})
+        (query-all (sfm/db)
+                   [(str "SELECT * FROM ("
+                         "   SELECT md5_digest, count(md5_digest) as count"
+                         "     FROM file"
+                         "    GROUP BY md5_digest)"
+                         " WHERE count > 1"
+                         " ORDER BY count")]))))
 
 (defn- cmd-describe-file
   "Describe a file identified by MD5 digest."
   [ md5-digest ]
-  (let [result-set (query-all (sfm/db)
-                              [(str "SELECT *"
-                                    "  FROM file"
-                                    " WHERE md5_digest=?"
-                                    " ORDER BY name")
-                               md5-digest])]
-    (pprint/print-table result-set)
-    (println "n=" (count result-set))))
+  (table
+   (query-all (sfm/db)
+              [(str "SELECT *"
+                    "  FROM file"
+                    " WHERE md5_digest=?"
+                    " ORDER BY name")
+               md5-digest])))
 
 (defn- s3-list-bucket-paged [ s3 bucket-name ]
   (letfn [(s3-list-objects [ cont-token ]
@@ -275,7 +281,7 @@
 
 (defn- display-help [ cmd-map ]
   (println "Valid Commands:")
-  (pprint/print-table
+  (table
    (map (fn [ cmd-name ]
           {:command cmd-name
            :help (:doc (meta (get cmd-map cmd-name)))
