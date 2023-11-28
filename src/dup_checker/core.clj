@@ -137,15 +137,16 @@
     (create-catalog catalog-name root-path catalog-type)))
 
 (defn- cmd-catalog-fs-files
-  "Catalog the contents of an s3 bucket (<root-path> <catalog-name>?)"
-  [ & args ]
-  (let [root-path (or (first args) ".")
-        catalog-name (or (second args) "default")]
-    (let [catalog-id (ensure-catalog catalog-name root-path "fs")
-          root (clojure.java.io/file root-path)
-          catalog-files (get-catalog-files catalog-id)]
-      (doseq [f (filter #(.isFile %) (file-seq root))]
-        (catalog-file catalog-files catalog-id (file-info root f))))))
+  "Catalog the contents of an s3 bucket."
+  ([ root-path ]
+   (cmd-catalog-fs-files root-path "default"))
+
+  ([ root-path catalog-name ]
+   (let [catalog-id (ensure-catalog catalog-name root-path "fs")
+         root (clojure.java.io/file root-path)
+         catalog-files (get-catalog-files catalog-id)]
+     (doseq [f (filter #(.isFile %) (file-seq root))]
+       (catalog-file catalog-files catalog-id (file-info root f))))))
 
 (defn- cmd-list-catalogs
   "List all catalogs"
@@ -168,22 +169,24 @@
                          " ORDER BY catalog_id")]))))
 
 (defn- cmd-list-catalog-files
-  "List all files present in a catalog (<catalog-name>)"
-  [ & args ]
-  (let [ catalog-name (or (first args) "default") ]
-    (pprint/print-table
-     (map (fn [ file-rec ]
-            {:md5-digest (:md5_digest file-rec)
-             :name (:name file-rec)
-             :size (:size file-rec)})
-          (let [catalog-id (or (get-catalog-id catalog-name)
-                               (fail "No known catalog: " catalog-name))]
-            (query-all (sfm/db)
-                       [(str "SELECT md5_digest, name, size"
-                             "  FROM file"
-                             " WHERE catalog_id=?"
-                             " ORDER BY md5_digest")
-                        catalog-id]))))))
+  "List all files present in a catalog."
+  ([ ]
+   (cmd-list-catalog-files "default"))
+
+  ([ catalog-name ]
+   (pprint/print-table
+    (map (fn [ file-rec ]
+           {:md5-digest (:md5_digest file-rec)
+            :name (:name file-rec)
+            :size (:size file-rec)})
+         (let [catalog-id (or (get-catalog-id catalog-name)
+                              (fail "No known catalog: " catalog-name))]
+           (query-all (sfm/db)
+                      [(str "SELECT md5_digest, name, size"
+                            "  FROM file"
+                            " WHERE catalog_id=?"
+                            " ORDER BY md5_digest")
+                       catalog-id]))))))
 
 (defn- cmd-list-dups
   "List all duplicate files by MD5 digest."
@@ -203,17 +206,16 @@
     (println "n=" (count result-set))))
 
 (defn- cmd-describe-file
-  "Describe a file identified by MD5 digest. (<md5-digest>)"
-  [ & args ]
-  (let [md5-digest (first args)
-        result-set (query-all (sfm/db)
+  "Describe a file identified by MD5 digest."
+  [ md5-digest ]
+  (let [result-set (query-all (sfm/db)
                               [(str "SELECT *"
                                     "  FROM file"
                                     " WHERE md5_digest=?"
                                     " ORDER BY name")
                                md5-digest])]
     (pprint/print-table result-set)
-    (println "n=" (count result-set))) )
+    (println "n=" (count result-set))))
 
 (defn- s3-list-bucket-paged [ s3 bucket-name ]
   (letfn [(s3-list-objects [ cont-token ]
@@ -236,21 +238,21 @@
    :md5-digest (.eTag f)})
 
 (defn- cmd-catalog-s3-files
-  "Catalog the contents of an s3 bucket (<bucket-name> <catalog-name>?)"
-  [ & args ]
-  (let [bucket-name (first args)
-        catalog-name (or (second args) "default")]
-    (let [catalog-id (ensure-catalog catalog-name bucket-name "s3")
-          catalog-files (get-catalog-files catalog-id)]
-      (doseq [f (s3-list-bucket-paged (s3-client) bucket-name)]
-        (catalog-file catalog-files catalog-id (s3-blob-info f))))))
+  "Catalog the contents of an s3 bucket."
+  ([ bucket-name ]
+   (cmd-catalog-s3-files bucket-name "default"))
+
+  ([ bucket-name catalog-name ]
+   (let [catalog-id (ensure-catalog catalog-name bucket-name "s3")
+         catalog-files (get-catalog-files catalog-id)]
+     (doseq [f (s3-list-bucket-paged (s3-client) bucket-name)]
+       (catalog-file catalog-files catalog-id (s3-blob-info f))))))
 
 (defn- cmd-list-s3-bucket
-  "List the contents of an s3 bucket (<bucket-name>)"
-  [ & args ]
-  (let [ bucket-name (first args)]
-    (doseq [ bucket (s3-list-bucket-paged (s3-client) bucket-name)]
-      (pprint/pprint bucket))))
+  "List the contents of an s3 bucket."
+  [ bucket-name ]
+  (doseq [ bucket (s3-list-bucket-paged (s3-client) bucket-name)]
+    (pprint/pprint bucket)))
 
 (def catalog-subcommands
   #^{:doc "Catalog subcommands"}
@@ -274,7 +276,8 @@
   (pprint/print-table
    (map (fn [ cmd-name ]
           {:command cmd-name
-           :help (:doc (meta (get cmd-map cmd-name)))})
+           :help (:doc (meta (get cmd-map cmd-name)))
+           :args (:arglists (meta (get cmd-map cmd-name)))})
         (sort (keys cmd-map)))))
 
 (defn- dispatch-subcommand [ cmd-map args ]
