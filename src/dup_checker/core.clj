@@ -115,14 +115,16 @@
     (update-catalog-date db-conn existing-catalog-id)
     (create-catalog db-conn catalog-name root-path)))
 
-(defn- cmd-catalog-fs-files [ db-conn catalog-name root-path ]
-  (let [catalog-id (ensure-catalog db-conn catalog-name root-path)
-        root (clojure.java.io/file root-path)
-        catalog-files (get-catalog-files db-conn catalog-id)]
-    (doseq [f (filter #(.isFile %) (file-seq root))]
-      (catalog-file db-conn catalog-files catalog-id (file-info root f)))))
+(defn- cmd-catalog-fs-files [ db-conn & args ]
+  (let [catalog-name (or (second args) "default")
+        root-path (or (first args) ".")]
+    (let [catalog-id (ensure-catalog db-conn catalog-name root-path)
+          root (clojure.java.io/file root-path)
+          catalog-files (get-catalog-files db-conn catalog-id)]
+      (doseq [f (filter #(.isFile %) (file-seq root))]
+        (catalog-file db-conn catalog-files catalog-id (file-info root f))))))
 
-(defn- cmd-list-catalogs [ db-conn]
+(defn- cmd-list-catalogs [ db-conn ]
   (pprint/print-table
    (map (fn [ catalog-rec ]
           {:n (:n catalog-rec)
@@ -136,20 +138,21 @@
                          " GROUP BY catalog.name, catalog.updated_on"
                          " ORDER BY name")]))))
 
-(defn- cmd-list-catalog-files [ db-conn catalog-name ]
-  (pprint/print-table
-   (map (fn [ file-rec ]
-          {:md5-digest (:md5_digest file-rec)
-           :name (:name file-rec)
-           :size (:size file-rec)})
-        (let [catalog-id (or (get-catalog-id db-conn catalog-name)
-                             (fail "No known catalog: " catalog-name))]
-          (query-all db-conn
-                     [(str "SELECT md5_digest, name, size"
-                           "  FROM file"
-                           " WHERE catalog_id=?"
-                           " ORDER BY md5_digest")
-                      catalog-id])))))
+(defn- cmd-list-catalog-files [ db-conn & args ]
+  (let [ catalog-name (or (first args) "default") ]
+    (pprint/print-table
+     (map (fn [ file-rec ]
+            {:md5-digest (:md5_digest file-rec)
+             :name (:name file-rec)
+             :size (:size file-rec)})
+          (let [catalog-id (or (get-catalog-id db-conn catalog-name)
+                               (fail "No known catalog: " catalog-name))]
+            (query-all db-conn
+                       [(str "SELECT md5_digest, name, size"
+                             "  FROM file"
+                             " WHERE catalog_id=?"
+                             " ORDER BY md5_digest")
+                        catalog-id]))))))
 
 (defn- cmd-list-dups [ db-conn ]
   (let [ result-set (query-all db-conn
@@ -165,18 +168,18 @@
 
     (println "n=" (count result-set))))
 
+(def subcommands
+  {"lsc" cmd-list-catalogs
+   "catalog" cmd-catalog-fs-files
+   "list" cmd-list-catalog-files
+   "list-dups" cmd-list-dups})
+
 (defn- dispatch-subcommand [ db-conn args ]
   (if (= (count args) 0)
     (fail "Insufficient arguments, missing subcommand.")
-    (let [ [ subcommand & args ] args ]
-
-      (case subcommand
-        "lsc" (cmd-list-catalogs db-conn)
-        "catalog" (cmd-catalog-fs-files db-conn
-                                    (or (second args) "default")
-                                    (or (first args) "."))
-        "list" (cmd-list-catalog-files db-conn (or (first args) "default"))
-        "list-dups" (cmd-list-dups db-conn)
+    (let [[ subcommand & args ] args]
+      (if-let [ cmd-fn (get subcommands subcommand) ]
+        (apply cmd-fn db-conn args)
         (fail "Unknown subcommand: " subcommand)))))
 
 (defn- app-main
