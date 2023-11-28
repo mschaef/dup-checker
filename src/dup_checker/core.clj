@@ -183,6 +183,15 @@
                            " ORDER BY md5_digest")
                       catalog-id])))))
 
+(defn- cmd-remove-catalog
+  "Remove a catalog."
+  [ catalog-name ]
+
+  (let [catalog-id (or (get-catalog-id catalog-name)
+                       (fail "No known catalog: " catalog-name))]
+    (jdbc/delete! (sfm/db) :file [ "catalog_id=?" catalog-id])
+    (jdbc/delete! (sfm/db) :catalog [ "catalog_id=?" catalog-id])))
+
 (defn- cmd-list-dups
   "List all duplicate files by MD5 digest."
   [ ]
@@ -249,7 +258,8 @@
 (def catalog-subcommands
   #^{:doc "Catalog subcommands"}
   {"ls" #'cmd-list-catalogs
-   "list-files" #'cmd-list-catalog-files})
+   "list-files" #'cmd-list-catalog-files
+   "rm" #'cmd-remove-catalog})
 
 (def s3-subcommands
   #^{:doc "AWS S3 subcommands"}
