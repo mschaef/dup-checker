@@ -188,9 +188,11 @@
   "List all duplicate files by MD5 digest."
   [ ]
   (let [ result-set (query-all (sfm/db)
-                               [(str "SELECT md5_digest, count(md5_digest) as count"
-                                     "  FROM file"
-                                     " GROUP BY md5_digest"
+                               [(str "SELECT * FROM ("
+                                     "   SELECT md5_digest, count(md5_digest) as count"
+                                     "     FROM file"
+                                     "    GROUP BY md5_digest)"
+                                     " WHERE count > 1"
                                      " ORDER BY count")])]
     (pprint/print-table
      (map (fn [ file-rec ]
