@@ -199,8 +199,20 @@
             {:md5-digest (:md5_digest file-rec)
              :count (:count file-rec)})
           result-set))
-
     (println "n=" (count result-set))))
+
+(defn- cmd-describe-file
+  "Describe a file identified by MD5 digest. (<md5-digest>)"
+  [ & args ]
+  (let [md5-digest (first args)
+        result-set (query-all (sfm/db)
+                              [(str "SELECT *"
+                                    "  FROM file"
+                                    " WHERE md5_digest=?"
+                                    " ORDER BY name")
+                               md5-digest])]
+    (pprint/print-table result-set)
+    (println "n=" (count result-set))) )
 
 (defn- s3-list-bucket-paged [ s3 bucket-name ]
   (letfn [(s3-list-objects [ cont-token ]
@@ -253,6 +265,7 @@
   {"s3" s3-subcommands
    "catalog" catalog-subcommands
    "fscat" #'cmd-catalog-fs-files
+   "describe" #'cmd-describe-file
    "list-dups" #'cmd-list-dups})
 
 (defn- display-help [ cmd-map ]
