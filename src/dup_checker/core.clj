@@ -5,6 +5,7 @@
   (:require [clojure.pprint :as pprint]
             [clj-commons.digest :as digest]
             [sql-file.core :as sql-file]
+            [sql-file.middleware :as sfm]
             [playbook.logging :as logging]
             [playbook.config :as config]
             [taoensso.timbre :as log]
@@ -48,8 +49,8 @@
                         ;;; Retry to accomodate potential I/O errors.
                           (digest/md5 (:file file-info)))})))
 
-(defn- file-cataloged? [ db-conn catalog-id file-info ]
-  (> (query-scalar db-conn
+(defn- file-cataloged? [ catalog-id file-info ]
+  (> (query-scalar (sfm/db)
                    [(str "SELECT COUNT(file_id)"
                          "  FROM file"
                          " WHERE file.name = ?"
@@ -58,8 +59,8 @@
                     catalog-id])
      0))
 
-(defn- get-catalog-files [ db-conn catalog-id ]
-  (set (map :name (query-all db-conn
+(defn- get-catalog-files [ catalog-id ]
+  (set (map :name (query-all (sfm/db)
                              [(str "SELECT name"
                                    "  FROM file"
                                    " WHERE file.catalog_id = ?")
@@ -72,7 +73,7 @@
     "zip" "svg" "tsp" "mod" "avi" "mp4" "xcf" "tif" "bmp"
     "mp3" "pdf" "arw" "ithmb" "gif" "nef" "png" "jpg"})
 
-(defn- catalog-file [ db-conn catalog-files catalog-id file-info ]
+(defn- catalog-file [ catalog-files catalog-id file-info ]
   (cond
     (catalog-files (:name file-info))
     (log/info "File already cataloged:" (:name file-info))
@@ -83,7 +84,7 @@
     :else
     (let [ file-info (compute-file-digests file-info )]
       (log/info "Adding file to catalog:" (:name file-info))
-      (jdbc/insert! db-conn
+      (jdbc/insert! (sfm/db)
                     :file
                     {:name (:name file-info)
                      :catalog_id catalog-id
@@ -92,15 +93,16 @@
                      :last_modified_on (:last-modified-on file-info)
                      :md5_digest (:md5-digest file-info)}))))
 
-(defn- get-catalog-id [ db-conn catalog-name ]
-  (query-scalar db-conn
+(defn- get-catalog-id [catalog-name ]
+  (query-scalar (sfm/db)
                 [(str "SELECT catalog_id"
                       "  FROM catalog"
                       " WHERE name = ?")
                  catalog-name]))
 
-(defn- update-catalog-date [ db-conn existing-catalog-id ]
-  (jdbc/update! db-conn :catalog
+(defn- update-catalog-date [ existing-catalog-id ]
+  (jdbc/update! (sfm/db)
+                :catalog
                 {:updated_on (java.util.Date.)}
                 ["catalog_id=?" existing-catalog-id])
   existing-catalog-id)
@@ -108,40 +110,40 @@
 (defn- current-hostname []
   (.getCanonicalHostName (java.net.InetAddress/getLocalHost)))
 
-(defn- find-catalog-type-id [ db-conn catalog-type ]
+(defn- find-catalog-type-id [ catalog-type ]
   ;; TODO: query-scaler-required
-  (query-scalar db-conn
+  (query-scalar (sfm/db)
                 [(str "SELECT catalog_type_id"
                       "  FROM catalog_type"
                       " WHERE catalog_type.catalog_type = ?")
                  catalog-type]))
 
-(defn- create-catalog [ db-conn catalog-name root-path catalog-type]
+(defn- create-catalog [ catalog-name root-path catalog-type]
   (:catalog_id (first
-                (jdbc/insert! db-conn
+                (jdbc/insert! (sfm/db)
                               :catalog
                               {:name catalog-name
-                               :catalog_type_id (find-catalog-type-id db-conn catalog-type)
+                               :catalog_type_id (find-catalog-type-id catalog-type)
                                :created_on (java.util.Date.)
                                :updated_on (java.util.Date.)
                                :root_path root-path
                                :hostname (current-hostname)}))))
 
-(defn- ensure-catalog [ db-conn catalog-name root-path catalog-type ]
-  (if-let [ existing-catalog-id (get-catalog-id db-conn catalog-name ) ]
-    (update-catalog-date db-conn existing-catalog-id)
-    (create-catalog db-conn catalog-name root-path catalog-type)))
+(defn- ensure-catalog [ catalog-name root-path catalog-type ]
+  (if-let [ existing-catalog-id (get-catalog-id catalog-name ) ]
+    (update-catalog-date existing-catalog-id)
+    (create-catalog catalog-name root-path catalog-type)))
 
-(defn- cmd-catalog-fs-files [ db-conn & args ]
+(defn- cmd-catalog-fs-files [ & args ]
   (let [catalog-name (or (second args) "default")
         root-path (or (first args) ".")]
-    (let [catalog-id (ensure-catalog db-conn catalog-name root-path "fs")
+    (let [catalog-id (ensure-catalog catalog-name root-path "fs")
           root (clojure.java.io/file root-path)
-          catalog-files (get-catalog-files db-conn catalog-id)]
+          catalog-files (get-catalog-files catalog-id)]
       (doseq [f (filter #(.isFile %) (file-seq root))]
-        (catalog-file db-conn catalog-files catalog-id (file-info root f))))))
+        (catalog-file catalog-files catalog-id (file-info root f))))))
 
-(defn- cmd-list-catalogs [ db-conn ]
+(defn- cmd-list-catalogs [ ]
   (pprint/print-table
    (map (fn [ catalog-rec ]
           {:n (:n catalog-rec)
@@ -150,7 +152,7 @@
            :catalog-type (:catalog_type catalog-rec)
            :size (:size catalog-rec)
            :updated-on (:updated_on catalog-rec)})
-        (query-all db-conn
+        (query-all (sfm/db)
                    [(str "SELECT catalog.name, catalog.root_path, catalog.updated_on, count(file_id) as n, sum(file.size) as size, catalog_type.catalog_type"
                          "  FROM catalog, file, catalog_type"
                          " WHERE catalog.catalog_id = file.catalog_id"
@@ -158,24 +160,24 @@
                          " GROUP BY catalog.name, catalog.updated_on, catalog_type, catalog.root_path"
                          " ORDER BY name")]))))
 
-(defn- cmd-list-catalog-files [ db-conn & args ]
+(defn- cmd-list-catalog-files [ & args ]
   (let [ catalog-name (or (first args) "default") ]
     (pprint/print-table
      (map (fn [ file-rec ]
             {:md5-digest (:md5_digest file-rec)
              :name (:name file-rec)
              :size (:size file-rec)})
-          (let [catalog-id (or (get-catalog-id db-conn catalog-name)
+          (let [catalog-id (or (get-catalog-id catalog-name)
                                (fail "No known catalog: " catalog-name))]
-            (query-all db-conn
+            (query-all (sfm/db)
                        [(str "SELECT md5_digest, name, size"
                              "  FROM file"
                              " WHERE catalog_id=?"
                              " ORDER BY md5_digest")
                         catalog-id]))))))
 
-(defn- cmd-list-dups [ db-conn ]
-  (let [ result-set (query-all db-conn
+(defn- cmd-list-dups [ ]
+  (let [ result-set (query-all (sfm/db)
                                [(str "SELECT md5_digest, count(md5_digest) as count"
                                      "  FROM file"
                                      " GROUP BY md5_digest"
@@ -211,15 +213,15 @@
    :size (.size f)
    :md5-digest (.eTag f)})
 
-(defn- cmd-catalog-s3-files [ db-conn & args  ]
+(defn- cmd-catalog-s3-files [ & args  ]
   (let [catalog-name (or (second args) "default")
         bucket-name (first args)]
-    (let [catalog-id (ensure-catalog db-conn catalog-name bucket-name "s3")
-          catalog-files (get-catalog-files db-conn catalog-id)]
+    (let [catalog-id (ensure-catalog catalog-name bucket-name "s3")
+          catalog-files (get-catalog-files catalog-id)]
       (doseq [f (s3-list-bucket-paged (s3-client) bucket-name)]
-        (catalog-file db-conn catalog-files catalog-id (s3-blob-info f))))))
+        (catalog-file catalog-files catalog-id (s3-blob-info f))))))
 
-(defn- cmd-list-s3-bucket [ db-conn & args ]
+(defn- cmd-list-s3-bucket [ & args ]
   (let [ bucket-name (first args)]
     (doseq [ bucket (s3-list-bucket-paged (s3-client) bucket-name)]
       (pprint/pprint bucket))))
@@ -232,12 +234,12 @@
    "list" cmd-list-catalog-files
    "list-dups" cmd-list-dups})
 
-(defn- dispatch-subcommand [ db-conn args ]
+(defn- dispatch-subcommand [ args ]
   (if (= (count args) 0)
     (fail "Insufficient arguments, missing subcommand.")
     (let [[ subcommand & args ] args]
       (if-let [ cmd-fn (get subcommands subcommand) ]
-        (apply cmd-fn db-conn args)
+        (apply cmd-fn args)
         (fail "Unknown subcommand: " subcommand)))))
 
 
@@ -266,7 +268,8 @@
   (app-main
    (fn [ config args ]
      (sql-file/with-pool [db-conn (db-conn-spec config)]
-       (dispatch-subcommand db-conn args)))
+       (sfm/with-db-connection db-conn
+         (dispatch-subcommand args))))
    args
    {:log-levels
     [[#{"hsqldb.*" "com.zaxxer.hikari.*"} :warn]
