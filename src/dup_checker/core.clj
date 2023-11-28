@@ -202,17 +202,14 @@
 
 (defn- s3-list-bucket-paged [ s3 bucket-name ]
   (letfn [(s3-list-objects [ cont-token ]
-            (log/info "s3 listing with token: " cont-token)
             (let [ resp (.listObjectsV2 s3 (-> (software.amazon.awssdk.services.s3.model.ListObjectsV2Request/builder)
                                                (.bucket bucket-name)
                                                (.continuationToken cont-token)
                                                (.build)))]
-              (log/info "RESP" resp)
               (if (.isTruncated resp)
                 (lazy-seq (concat (.contents resp)
                                   (s3-list-objects (.nextContinuationToken resp))))
                 (.contents resp))))]
-
     (s3-list-objects nil)))
 
 (defn- s3-blob-info [ f ]
@@ -240,12 +237,20 @@
     (doseq [ bucket (s3-list-bucket-paged (s3-client) bucket-name)]
       (pprint/pprint bucket))))
 
+(def catalog-subcommands
+  #^{:doc "Catalog subcommands"}
+  {"ls" #'cmd-list-catalogs
+   "list-files" #'cmd-list-catalog-files})
+
+(def s3-subcommands
+  #^{:doc "AWS S3 subcommands"}
+  {"ls" #'cmd-list-s3-bucket
+   "catalog" #'cmd-catalog-s3-files})
+
 (def subcommands
-  {"s3cat" #'cmd-catalog-s3-files
-   "s3ls" #'cmd-list-s3-bucket
-   "lsc" #'cmd-list-catalogs
-   "catalog" #'cmd-catalog-fs-files
-   "list" #'cmd-list-catalog-files
+  {"s3" s3-subcommands
+   "catalog" catalog-subcommands
+   "fscat" #'cmd-catalog-fs-files
    "list-dups" #'cmd-list-dups})
 
 (defn- display-help [ cmd-map ]
@@ -254,7 +259,7 @@
    (map (fn [ cmd-name ]
           {:command cmd-name
            :help (:doc (meta (get cmd-map cmd-name)))})
-        (sort (keys subcommands)))))
+        (sort (keys cmd-map)))))
 
 (defn- dispatch-subcommand [ cmd-map args ]
   (try
@@ -262,8 +267,10 @@
       (fail "Insufficient arguments, missing subcommand.")
       (let [[ subcommand & args ] args]
         (if-let [ cmd-fn (get (assoc cmd-map "help" #(display-help cmd-map)) subcommand) ]
-          (with-exception-barrier :command-processing
-            (apply cmd-fn args))
+          (if (map? cmd-fn)
+            (dispatch-subcommand cmd-fn args)
+            (with-exception-barrier :command-processing
+              (apply cmd-fn args)))
           (fail "Unknown subcommand: " subcommand))))
     (catch Exception e
       (display-help cmd-map))))
