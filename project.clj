@@ -6,7 +6,9 @@
   :dependencies [[org.clojure/clojure "1.11.1"]
                  [listora/again "1.0.0"]
                  [org.clj-commons/digest "1.4.100"]
+                 [software.amazon.awssdk/s3  "2.20.52"]
                  [com.mschaef/sql-file "0.4.8"]
+                 [clojure-ini "0.0.2"]
                  ;; TODO: This brings in an awful lot for a CLI app.
                  [com.mschaef/playbook "0.0.10"]]
 
