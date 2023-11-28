@@ -14,7 +14,9 @@
             [again.core :as again]))
 
 (defn- fail [ message & args ]
-  (throw (RuntimeException. (apply str message args))))
+  (let [ full-message (apply str message args)]
+    (println (str "Error: " full-message))
+    (throw (RuntimeException. full-message))))
 
 (defn- s3-client []
   (-> (software.amazon.awssdk.services.s3.S3Client/builder)
@@ -134,16 +136,20 @@
     (update-catalog-date existing-catalog-id)
     (create-catalog catalog-name root-path catalog-type)))
 
-(defn- cmd-catalog-fs-files [ & args ]
-  (let [catalog-name (or (second args) "default")
-        root-path (or (first args) ".")]
+(defn- cmd-catalog-fs-files
+  "Catalog the contents of an s3 bucket (<root-path> <catalog-name>?)"
+  [ & args ]
+  (let [root-path (or (first args) ".")
+        catalog-name (or (second args) "default")]
     (let [catalog-id (ensure-catalog catalog-name root-path "fs")
           root (clojure.java.io/file root-path)
           catalog-files (get-catalog-files catalog-id)]
       (doseq [f (filter #(.isFile %) (file-seq root))]
         (catalog-file catalog-files catalog-id (file-info root f))))))
 
-(defn- cmd-list-catalogs [ ]
+(defn- cmd-list-catalogs
+  "List all catalogs"
+  [ ]
   (pprint/print-table
    (map (fn [ catalog-rec ]
           {:n (:n catalog-rec)
@@ -160,7 +166,9 @@
                          " GROUP BY catalog.name, catalog.updated_on, catalog_type, catalog.root_path"
                          " ORDER BY name")]))))
 
-(defn- cmd-list-catalog-files [ & args ]
+(defn- cmd-list-catalog-files
+  "List all files present in a catalog (<catalog-name>)"
+  [ & args ]
   (let [ catalog-name (or (first args) "default") ]
     (pprint/print-table
      (map (fn [ file-rec ]
@@ -176,7 +184,9 @@
                              " ORDER BY md5_digest")
                         catalog-id]))))))
 
-(defn- cmd-list-dups [ ]
+(defn- cmd-list-dups
+  "List all duplicate files by MD5 digest."
+  [ ]
   (let [ result-set (query-all (sfm/db)
                                [(str "SELECT md5_digest, count(md5_digest) as count"
                                      "  FROM file"
@@ -213,34 +223,50 @@
    :size (.size f)
    :md5-digest (.eTag f)})
 
-(defn- cmd-catalog-s3-files [ & args  ]
-  (let [catalog-name (or (second args) "default")
-        bucket-name (first args)]
+(defn- cmd-catalog-s3-files
+  "Catalog the contents of an s3 bucket (<bucket-name> <catalog-name>?)"
+  [ & args ]
+  (let [bucket-name (first args)
+        catalog-name (or (second args) "default")]
     (let [catalog-id (ensure-catalog catalog-name bucket-name "s3")
           catalog-files (get-catalog-files catalog-id)]
       (doseq [f (s3-list-bucket-paged (s3-client) bucket-name)]
         (catalog-file catalog-files catalog-id (s3-blob-info f))))))
 
-(defn- cmd-list-s3-bucket [ & args ]
+(defn- cmd-list-s3-bucket
+  "List the contents of an s3 bucket (<bucket-name>)"
+  [ & args ]
   (let [ bucket-name (first args)]
     (doseq [ bucket (s3-list-bucket-paged (s3-client) bucket-name)]
       (pprint/pprint bucket))))
 
 (def subcommands
-  {"s3cat" cmd-catalog-s3-files
-   "s3ls" cmd-list-s3-bucket
-   "lsc" cmd-list-catalogs
-   "catalog" cmd-catalog-fs-files
-   "list" cmd-list-catalog-files
-   "list-dups" cmd-list-dups})
+  {"s3cat" #'cmd-catalog-s3-files
+   "s3ls" #'cmd-list-s3-bucket
+   "lsc" #'cmd-list-catalogs
+   "catalog" #'cmd-catalog-fs-files
+   "list" #'cmd-list-catalog-files
+   "list-dups" #'cmd-list-dups})
 
-(defn- dispatch-subcommand [ args ]
-  (if (= (count args) 0)
-    (fail "Insufficient arguments, missing subcommand.")
-    (let [[ subcommand & args ] args]
-      (if-let [ cmd-fn (get subcommands subcommand) ]
-        (apply cmd-fn args)
-        (fail "Unknown subcommand: " subcommand)))))
+(defn- display-help [ cmd-map ]
+  (println "Valid Commands:")
+  (pprint/print-table
+   (map (fn [ cmd-name ]
+          {:command cmd-name
+           :help (:doc (meta (get cmd-map cmd-name)))})
+        (sort (keys subcommands)))))
+
+(defn- dispatch-subcommand [ cmd-map args ]
+  (try
+    (if (= (count args) 0)
+      (fail "Insufficient arguments, missing subcommand.")
+      (let [[ subcommand & args ] args]
+        (if-let [ cmd-fn (get (assoc cmd-map "help" #(display-help cmd-map)) subcommand) ]
+          (with-exception-barrier :command-processing
+            (apply cmd-fn args))
+          (fail "Unknown subcommand: " subcommand))))
+    (catch Exception e
+      (display-help cmd-map))))
 
 
 (defn- app-main
@@ -269,7 +295,7 @@
    (fn [ config args ]
      (sql-file/with-pool [db-conn (db-conn-spec config)]
        (sfm/with-db-connection db-conn
-         (dispatch-subcommand args))))
+         (dispatch-subcommand subcommands args))))
    args
    {:log-levels
     [[#{"hsqldb.*" "com.zaxxer.hikari.*"} :warn]
