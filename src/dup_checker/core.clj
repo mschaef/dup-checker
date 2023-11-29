@@ -200,21 +200,31 @@
     (jdbc/delete! (sfm/db) :file [ "catalog_id=?" catalog-id])
     (jdbc/delete! (sfm/db) :catalog [ "catalog_id=?" catalog-id])))
 
+
+(defn- filenames-by-digest [ ]
+  (into {} (map (fn [ value ]
+                  [(:md5_digest value) (:name value)])
+                (query-all (sfm/db)
+                           [(str "SELECT md5_digest, name"
+                                 "  FROM file")]))))
+
 (defn- cmd-list-dups
   "List all duplicate files by MD5 digest."
   [ ]
 
-  (table
-   (map (fn [ file-rec ]
-          {:md5-digest (:md5_digest file-rec)
-           :count (:count file-rec)})
-        (query-all (sfm/db)
-                   [(str "SELECT * FROM ("
-                         "   SELECT md5_digest, count(md5_digest) as count"
-                         "     FROM file"
-                         "    GROUP BY md5_digest)"
-                         " WHERE count > 1"
-                         " ORDER BY count")]))))
+  (let [ md5-to-filename (filenames-by-digest)]
+    (table
+     (map (fn [ file-rec ]
+            {:md5-digest (:md5_digest file-rec)
+             :count (:count file-rec)
+             :name (md5-to-filename (:md5_digest file-rec))})
+          (query-all (sfm/db)
+                     [(str "SELECT * FROM ("
+                           "   SELECT md5_digest, count(md5_digest) as count"
+                           "     FROM file"
+                           "    GROUP BY md5_digest)"
+                           " WHERE count > 1"
+                           " ORDER BY count")])))))
 
 (defn- cmd-describe-file
   "Describe a file identified by MD5 digest."
