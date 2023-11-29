@@ -5,6 +5,7 @@
   (:require [clojure.pprint :as pprint]
             [clj-commons.digest :as digest]
             [sql-file.core :as sql-file]
+            [sql-file.middleware :as sfm]
             [playbook.logging :as logging]
             [playbook.config :as config]
             [taoensso.timbre :as log]
@@ -12,8 +13,23 @@
             [clj-http.client :as http]
             [again.core :as again]))
 
-(defn- fail [ message ]
-  (throw (RuntimeException. message)))
+(defn- fail [ message & args ]
+  (let [ full-message (apply str message args)]
+    (println (str "Error: " full-message))
+    (throw (RuntimeException. full-message))))
+
+(defn- table
+  ([ rows ]
+   (table (keys (first rows)) rows))
+
+  ([ ks rows ]
+   (pprint/print-table ks rows)
+   (println "n=" (count rows))))
+
+(defn- s3-client []
+  (-> (software.amazon.awssdk.services.s3.S3Client/builder)
+      (.region software.amazon.awssdk.regions.Region/US_EAST_1)
+      (.build)))
 
 ;;; Acquire token through Google OAuth playground
 ;;;
@@ -64,14 +80,16 @@
 (def retry-policy [ 0 5000 10000 15000 ])
 
 (defn- compute-file-digests [ file-info ]
-  (merge file-info
+  (if (:md5-digest file-info)
+    file-info
+    (merge file-info
          ;;; MD5 only, because that's all the S3 API supports.
-         {:md5-digest (again/with-retries retry-policy
+           {:md5-digest (again/with-retries retry-policy
                         ;;; Retry to accomodate potential I/O errors.
-                        (digest/md5 (:file file-info)))}))
+                          (digest/md5 (:file file-info)))})))
 
-(defn- file-cataloged? [ db-conn catalog-id file-info ]
-  (> (query-scalar db-conn
+(defn- file-cataloged? [ catalog-id file-info ]
+  (> (query-scalar (sfm/db)
                    [(str "SELECT COUNT(file_id)"
                          "  FROM file"
                          " WHERE file.name = ?"
@@ -80,8 +98,8 @@
                     catalog-id])
      0))
 
-(defn- get-catalog-files [ db-conn catalog-id ]
-  (set (map :name (query-all db-conn
+(defn- get-catalog-files [ catalog-id ]
+  (set (map :name (query-all (sfm/db)
                              [(str "SELECT name"
                                    "  FROM file"
                                    " WHERE file.catalog_id = ?")
@@ -94,7 +112,7 @@
     "zip" "svg" "tsp" "mod" "avi" "mp4" "xcf" "tif" "bmp"
     "mp3" "pdf" "arw" "ithmb" "gif" "nef" "png" "jpg"})
 
-(defn- catalog-file [ db-conn catalog-files catalog-id file-info ]
+(defn- catalog-file [ catalog-files catalog-id file-info ]
   (cond
     (catalog-files (:name file-info))
     (log/info "File already cataloged:" (:name file-info))
@@ -105,7 +123,7 @@
     :else
     (let [ file-info (compute-file-digests file-info )]
       (log/info "Adding file to catalog:" (:name file-info))
-      (jdbc/insert! db-conn
+      (jdbc/insert! (sfm/db)
                     :file
                     {:name (:name file-info)
                      :catalog_id catalog-id
@@ -114,15 +132,16 @@
                      :last_modified_on (:last-modified-on file-info)
                      :md5_digest (:md5-digest file-info)}))))
 
-(defn- get-catalog-id [ db-conn catalog-name ]
-  (query-scalar db-conn
+(defn- get-catalog-id [catalog-name ]
+  (query-scalar (sfm/db)
                 [(str "SELECT catalog_id"
                       "  FROM catalog"
                       " WHERE name = ?")
                  catalog-name]))
 
-(defn- update-catalog-date [ db-conn existing-catalog-id ]
-  (jdbc/update! db-conn :catalog
+(defn- update-catalog-date [ existing-catalog-id ]
+  (jdbc/update! (sfm/db)
+                :catalog
                 {:updated_on (java.util.Date.)}
                 ["catalog_id=?" existing-catalog-id])
   existing-catalog-id)
@@ -130,94 +149,219 @@
 (defn- current-hostname []
   (.getCanonicalHostName (java.net.InetAddress/getLocalHost)))
 
-(defn- create-catalog [ db-conn catalog-name root-path ]
+(defn- find-catalog-type-id [ catalog-type ]
+  ;; TODO: query-scaler-required
+  (query-scalar (sfm/db)
+                [(str "SELECT catalog_type_id"
+                      "  FROM catalog_type"
+                      " WHERE catalog_type.catalog_type = ?")
+                 catalog-type]))
+
+(defn- create-catalog [ catalog-name root-path catalog-type]
   (:catalog_id (first
-                (jdbc/insert! db-conn
+                (jdbc/insert! (sfm/db)
                               :catalog
                               {:name catalog-name
+                               :catalog_type_id (find-catalog-type-id catalog-type)
                                :created_on (java.util.Date.)
                                :updated_on (java.util.Date.)
                                :root_path root-path
                                :hostname (current-hostname)}))))
 
-(defn- ensure-catalog [ db-conn catalog-name root-path ]
-  (if-let [ existing-catalog-id (get-catalog-id db-conn catalog-name ) ]
-    (update-catalog-date db-conn existing-catalog-id)
-    (create-catalog db-conn catalog-name root-path)))
+(defn- ensure-catalog [ catalog-name root-path catalog-type ]
+  (if-let [ existing-catalog-id (get-catalog-id catalog-name ) ]
+    (update-catalog-date existing-catalog-id)
+    (create-catalog catalog-name root-path catalog-type)))
 
-(defn- cmd-catalog-fs-files [ db-conn catalog-name root-path ]
-  (let [catalog-id (ensure-catalog db-conn catalog-name root-path)
+(defn- cmd-catalog-fs-files
+  "Catalog the contents of an s3 bucket."
+  [ root-path catalog-name ]
+  (let [catalog-id (ensure-catalog catalog-name root-path "fs")
         root (clojure.java.io/file root-path)
-        catalog-files (get-catalog-files db-conn catalog-id)]
+        catalog-files (get-catalog-files catalog-id)]
     (doseq [f (filter #(.isFile %) (file-seq root))]
-      (catalog-file db-conn catalog-files catalog-id (file-info root f)))))
+      (catalog-file catalog-files catalog-id (file-info root f)))))
 
-(defn- cmd-list-catalogs [ db-conn]
-  (pprint/print-table
+(defn- cmd-list-catalogs
+  "List all catalogs"
+  [ ]
+  (table
    (map (fn [ catalog-rec ]
           {:n (:n catalog-rec)
+           :id (:catalog_id catalog-rec)
            :name (:name catalog-rec)
+           :root-path (:root_path catalog-rec)
+           :catalog-type (:catalog_type catalog-rec)
            :size (:size catalog-rec)
            :updated-on (:updated_on catalog-rec)})
-        (query-all db-conn
-                   [(str "SELECT catalog.name, catalog.updated_on, count(file_id) as n, sum(file.size) as size"
-                         "  FROM catalog, file"
+        (query-all (sfm/db)
+                   [(str "SELECT catalog.catalog_id, catalog.name, catalog.root_path, catalog.updated_on, count(file_id) as n, sum(file.size) as size, catalog_type.catalog_type"
+                         "  FROM catalog, file, catalog_type"
                          " WHERE catalog.catalog_id = file.catalog_id"
-                         " GROUP BY catalog.name, catalog.updated_on"
-                         " ORDER BY name")]))))
+                         "   AND catalog.catalog_type_id = catalog_type.catalog_type_id"
+                         " GROUP BY catalog.catalog_id, catalog.name, catalog.updated_on, catalog_type, catalog.root_path"
+                         " ORDER BY catalog_id")]))))
 
-(defn- cmd-list-catalog-files [ db-conn catalog-name ]
-  (pprint/print-table
+(defn- cmd-list-catalog-files
+  "List all files present in a catalog."
+  [ catalog-name ]
+
+  (table
    (map (fn [ file-rec ]
           {:md5-digest (:md5_digest file-rec)
            :name (:name file-rec)
            :size (:size file-rec)})
-        (let [catalog-id (or (get-catalog-id db-conn catalog-name)
-                             (fail (str "No known catalog: " catalog-name)))]
-          (query-all db-conn
+        (let [catalog-id (or (get-catalog-id catalog-name)
+                             (fail "No known catalog: " catalog-name))]
+          (query-all (sfm/db)
                      [(str "SELECT md5_digest, name, size"
                            "  FROM file"
                            " WHERE catalog_id=?"
                            " ORDER BY md5_digest")
                       catalog-id])))))
 
-(defn- cmd-list-dups [ db-conn ]
-  (let [ result-set (query-all db-conn
-                               [(str "SELECT md5_digest, count(md5_digest) as count"
-                                     "  FROM file"
-                                     " GROUP BY md5_digest"
-                                     " ORDER BY count")])]
-    (pprint/print-table
+(defn- cmd-remove-catalog
+  "Remove a catalog."
+  [ catalog-name ]
+
+  (let [catalog-id (or (get-catalog-id catalog-name)
+                       (fail "No known catalog: " catalog-name))]
+    (jdbc/delete! (sfm/db) :file [ "catalog_id=?" catalog-id])
+    (jdbc/delete! (sfm/db) :catalog [ "catalog_id=?" catalog-id])))
+
+
+(defn- filenames-by-digest [ ]
+  (into {} (map (fn [ value ]
+                  [(:md5_digest value) (:name value)])
+                (query-all (sfm/db)
+                           [(str "SELECT md5_digest, name"
+                                 "  FROM file")]))))
+
+(defn- cmd-list-dups
+  "List all duplicate files by MD5 digest."
+  [ ]
+
+  (let [ md5-to-filename (filenames-by-digest)]
+    (table
      (map (fn [ file-rec ]
             {:md5-digest (:md5_digest file-rec)
-             :count (:count file-rec)})
-          result-set))
+             :count (:count file-rec)
+             :name (md5-to-filename (:md5_digest file-rec))})
+          (query-all (sfm/db)
+                     [(str "SELECT * FROM ("
+                           "   SELECT md5_digest, count(md5_digest) as count"
+                           "     FROM file"
+                           "    GROUP BY md5_digest)"
+                           " WHERE count > 1"
+                           " ORDER BY count")])))))
 
-    (println "n=" (count result-set))))
+(defn- cmd-describe-file
+  "Describe a file identified by MD5 digest."
+  [ md5-digest ]
+  (table
+   (query-all (sfm/db)
+              [(str "SELECT *"
+                    "  FROM file"
+                    " WHERE md5_digest=?"
+                    " ORDER BY name")
+               md5-digest])))
 
-(defn- cmd-list-gphoto-albums []
+(defn- s3-list-bucket-paged [ s3 bucket-name ]
+  (letfn [(s3-list-objects [ cont-token ]
+            (let [ resp (.listObjectsV2 s3 (-> (software.amazon.awssdk.services.s3.model.ListObjectsV2Request/builder)
+                                               (.bucket bucket-name)
+                                               (.continuationToken cont-token)
+                                               (.build)))]
+              (if (.isTruncated resp)
+                (lazy-seq (concat (.contents resp)
+                                  (s3-list-objects (.nextContinuationToken resp))))
+                (.contents resp))))]
+    (s3-list-objects nil)))
+
+(defn- s3-blob-info [ f ]
+  {:full-path (.key f)
+   :extension (get-file-extension (java.io.File. (.key f)))
+   :last-modified-on (.lastModified f)
+   :name (.key f)
+   :size (.size f)
+   :md5-digest (.replace (.eTag f) "\"" "")})
+
+(defn- cmd-catalog-s3-files
+  "Catalog the contents of an s3 bucket."
+  [ bucket-name catalog-name ]
+  (let [catalog-id (ensure-catalog catalog-name bucket-name "s3")
+        catalog-files (get-catalog-files catalog-id)]
+    (doseq [f (s3-list-bucket-paged (s3-client) bucket-name)]
+      (catalog-file catalog-files catalog-id (s3-blob-info f)))))
+
+(defn- cmd-list-s3-bucket
+  "List the contents of an s3 bucket."
+  [ bucket-name ]
+  (doseq [ bucket (s3-list-bucket-paged (s3-client) bucket-name)]
+    (pprint/pprint bucket)))
+
+(defn- cmd-list-gphoto-albums
+  "List available Google Photo Albums"
+
+  []
   (doseq [ album (get-gphoto-albums) ]
     (pprint/pprint album)))
 
-(defn- cmd-list-gphoto-media-items []
+(defn- cmd-list-gphoto-media-items
+  "List available Google Photo media items."
+
+  []
   (doseq [ item (get-gphoto-media-items) ]
     (pprint/pprint item)))
 
-(defn- dispatch-subcommand [ db-conn args ]
-  (if (= (count args) 0)
-    (fail "Insufficient arguments.")
-    (let [ [ subcommand & args ] args ]
 
-      (case subcommand
-        "lsgpa"  (cmd-list-gphoto-albums)
-        "lsgpm" (cmd-list-gphoto-media-items)
-        "lsc" (cmd-list-catalogs db-conn)
-        "catalog" (cmd-catalog-fs-files db-conn
-                                    (or (second args) "default")
-                                    (or (first args) "."))
-        "list" (cmd-list-catalog-files db-conn (or (first args) "default"))
-        "list-dups" (cmd-list-dups db-conn)
-        (fail "Unknown subcommand")))))
+(def gphoto-subcommands
+  #^{:doc "Google Photo subcommands"}
+  {"lsa" #'cmd-list-gphoto-albums
+   "lsmi" #'cmd-list-gphoto-media-items})
+
+(def catalog-subcommands
+  #^{:doc "Catalog subcommands"}
+  {"ls" #'cmd-list-catalogs
+   "list-files" #'cmd-list-catalog-files
+   "rm" #'cmd-remove-catalog})
+
+(def s3-subcommands
+  #^{:doc "AWS S3 subcommands"}
+  {"ls" #'cmd-list-s3-bucket
+   "catalog" #'cmd-catalog-s3-files})
+
+(def subcommands
+  {"s3" s3-subcommands
+   "catalog" catalog-subcommands
+   "gphoto" gphoto-subcommands
+   "fscat" #'cmd-catalog-fs-files
+   "describe" #'cmd-describe-file
+   "list-dups" #'cmd-list-dups})
+
+(defn- display-help [ cmd-map ]
+  (println "Valid Commands:")
+  (table
+   (map (fn [ cmd-name ]
+          {:command cmd-name
+           :help (:doc (meta (get cmd-map cmd-name)))
+           :args (:arglists (meta (get cmd-map cmd-name)))})
+        (sort (keys cmd-map)))))
+
+(defn- dispatch-subcommand [ cmd-map args ]
+  (try
+    (if (= (count args) 0)
+      (fail "Insufficient arguments, missing subcommand.")
+      (let [[ subcommand & args ] args]
+        (if-let [ cmd-fn (get (assoc cmd-map "help" #(display-help cmd-map)) subcommand) ]
+          (if (map? cmd-fn)
+            (dispatch-subcommand cmd-fn args)
+            (with-exception-barrier :command-processing
+              (apply cmd-fn args)))
+          (fail "Unknown subcommand: " subcommand))))
+    (catch Exception e
+      (display-help cmd-map))))
+
 
 (defn- app-main
   ([ entry args config-overrides ]
@@ -238,14 +382,15 @@
   {:name (or (config-property "db.subname")
              (get-in config [:db :subname] "dup-checker"))
    :schema-path [ "sql/" ]
-   :schemas [[ "dup-checker" 0 ]]})
+   :schemas [[ "dup-checker" 1 ]]})
 
 
 (defn -main [& args] ;; TODO: Does playbook need a standard main? Or wrapper?
   (app-main
    (fn [ config args ]
      (sql-file/with-pool [db-conn (db-conn-spec config)]
-       (dispatch-subcommand db-conn args)))
+       (sfm/with-db-connection db-conn
+         (dispatch-subcommand subcommands args))))
    args
    {:log-levels
     [[#{"hsqldb.*" "com.zaxxer.hikari.*"} :warn]

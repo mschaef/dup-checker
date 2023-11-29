@@ -6,6 +6,7 @@
   :dependencies [[org.clojure/clojure "1.11.1"]
                  [listora/again "1.0.0"]
                  [org.clj-commons/digest "1.4.100"]
+                 [software.amazon.awssdk/s3  "2.20.52"]
                  [com.mschaef/sql-file "0.4.8"]
                  [clj-http "3.12.3"
                   :exclusions [com.fasterxml.jackson.core/jackson-core]]
