@@ -255,7 +255,7 @@
    :last-modified-on (.lastModified f)
    :name (.key f)
    :size (.size f)
-   :md5-digest (.eTag f)})
+   :md5-digest (.replace (.eTag f) "\"" "")})
 
 (defn- cmd-catalog-s3-files
   "Catalog the contents of an s3 bucket."
