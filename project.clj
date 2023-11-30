@@ -8,8 +8,10 @@
                  [org.clj-commons/digest "1.4.100"]
                  [software.amazon.awssdk/s3  "2.20.52"]
                  [com.mschaef/sql-file "0.4.8"]
+                 [ring/ring-jetty-adapter "1.9.6"]
                  [clj-http "3.12.3"
                   :exclusions [com.fasterxml.jackson.core/jackson-core]]
+                 [org.clojure/core.async "1.6.681"]
                  ;; TODO: This brings in an awful lot for a CLI app.
                  [com.mschaef/playbook "0.0.10"]]
 

@@ -11,7 +11,12 @@
             [taoensso.timbre :as log]
             [clojure.java.jdbc :as jdbc]
             [clj-http.client :as http]
-            [again.core :as again]))
+            [ring.adapter.jetty :as jetty]
+            [ring.util.response :as ring]
+            [again.core :as again]
+            [clojure.core.async :as async]
+            [clojure.java.browse :as browse]
+            [ring.middleware.params :as params]))
 
 (defn- fail [ message & args ]
   (let [ full-message (apply str message args)]
@@ -26,16 +31,6 @@
    (pprint/print-table ks rows)
    (println "n=" (count rows))))
 
-(defn- s3-client []
-  (-> (software.amazon.awssdk.services.s3.S3Client/builder)
-      (.region software.amazon.awssdk.regions.Region/US_EAST_1)
-      (.build)))
-
-;;; Acquire token through Google OAuth playground
-;;;
-;;; https://developers.google.com/oauthplayground/
-;;; API Scope: https://www.googleapis.com/auth/photoslibrary.readonly
-
 (defn- http-request-json [ url ]
   (let [response (http/get url
                            {:headers
@@ -43,6 +38,61 @@
     (and (= 200 (:status response))
          (try-parse-json (:body response)))))
 
+(defn- http-request-json-post [ url ]
+  (let [response (http/post url)]
+    (and (= 200 (:status response))
+         (try-parse-json (:body response)))))
+
+(defn- s3-client []
+  (-> (software.amazon.awssdk.services.s3.S3Client/builder)
+      (.region software.amazon.awssdk.regions.Region/US_EAST_1)
+      (.build)))
+
+(defn- request-google-authorization [ oauth ]
+  (browse/browse-url
+   (format "%s?client_id=%s&redirect_uri=%s&response_type=%s&scope=%s"
+           (:auth_uri oauth)
+           (:client_id oauth)
+           "http://localhost:8080"
+           "code"
+           "https://www.googleapis.com/auth/photoslibrary.readonly")))
+
+(defn start-site [ handler ]
+  (let [ http-port 8080 ]
+    (log/info "Starting Webserver on port" http-port)
+    (let [ server (jetty/run-jetty (-> handler
+                                       params/wrap-params)
+                                   { :port http-port :join? false })]
+      (add-shutdown-hook #(.stop server))
+      server)))
+
+(defn- accept-oauth-code [ oauth ]
+  (let [c (async/chan)
+        server (start-site #(let [ params (:params %) ]
+                              (async/>!! c (or (params "code") false))
+                              (if-let [ error (params "error") ]
+                                (ring/response (str "Error: " error))
+                                (ring/response "OK"))))]
+    (request-google-authorization oauth)
+    (let [ resp (async/<!! c)]
+      (.stop server)
+      resp)))
+
+(defn- exchange-code [ oauth code ]
+  (http-request-json-post
+   (format "%s?client_id=%s&client_secret=%s&redirect_uri=%s&code=%s&grant_type=%s"
+           "https://oauth2.googleapis.com/token"
+           (:client_id oauth)
+           (:client_secret oauth)
+           "http://localhost:8080"
+           code
+           "authorization_code")))
+
+(defn gphoto-auth []
+  (let [oauth (:installed (try-parse-json (slurp "google-oauth.json")))
+        code (accept-oauth-code oauth)]
+    (if code
+      (log/spy :info (exchange-code oauth code)))))
 
 (defn- get-gphoto-paged-stream [ url items-key ]
   (letfn [(query-page [ page-token ]
@@ -337,7 +387,8 @@
    "gphoto" gphoto-subcommands
    "fscat" #'cmd-catalog-fs-files
    "describe" #'cmd-describe-file
-   "list-dups" #'cmd-list-dups})
+   "list-dups" #'cmd-list-dups
+   "gphoto-auth" #'gphoto-auth})
 
 (defn- display-help [ cmd-map ]
   (println "Valid Commands:")
