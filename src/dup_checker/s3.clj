@@ -34,10 +34,9 @@
 (defn- cmd-catalog-s3-files
   "Catalog the contents of an s3 bucket."
   [ bucket-name catalog-name ]
-  (let [catalog-id (catalog/ensure-catalog catalog-name bucket-name "s3")
-        catalog-files (catalog/get-catalog-files catalog-id)]
-    (doseq [f (s3-list-bucket-paged (s3-client) bucket-name)]
-      (catalog/catalog-file catalog-files catalog-id (s3-blob-info f)))))
+
+  (catalog/catalog-files (catalog/ensure-catalog catalog-name bucket-name "s3")
+                         (map s3-blob-info (s3-list-bucket-paged (s3-client) bucket-name))))
 
 (defn- cmd-list-s3-bucket
   "List the contents of an s3 bucket."

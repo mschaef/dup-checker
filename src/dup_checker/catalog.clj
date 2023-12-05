@@ -3,7 +3,6 @@
         sql-file.sql-util)
   (:require [clojure.pprint :as pprint]
             [taoensso.timbre :as log]
-            [clj-commons.digest :as digest]
             [clojure.java.jdbc :as jdbc]
             [sql-file.middleware :as sfm]))
 
@@ -69,7 +68,7 @@
     "zip" "svg" "tsp" "mod" "avi" "mp4" "xcf" "tif" "bmp"
     "mp3" "pdf" "arw" "ithmb" "gif" "nef" "png" "jpg"})
 
-(defn catalog-file [ catalog-files catalog-id file-info ]
+(defn- catalog-file [ catalog-files catalog-id file-info ]
   (cond
     (catalog-files (:name file-info))
     (log/info "File already cataloged:" (:name file-info))
@@ -88,6 +87,11 @@
                      :size (:size file-info)
                      :last_modified_on (:last-modified-on file-info)
                      :md5_digest (force (:md5-digest file-info))}))))
+
+(defn catalog-files [ catalog-id file-infos ]
+  (let [catalog-files (get-catalog-files catalog-id)]
+    (doseq [ f file-infos ]
+      (catalog-file catalog-files catalog-id f))))
 
 (defn- cmd-list-catalogs
   "List all catalogs"

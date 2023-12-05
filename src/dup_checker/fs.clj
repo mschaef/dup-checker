@@ -21,16 +21,15 @@
      :md5-digest (delay
                    (again/with-retries retry-policy
                      ;; Retry to accomodate potential I/O errors.
-                     (digest/md5 (:file file-info))))}))
+                     (digest/md5 f)))}))
 
 (defn- cmd-catalog-fs-files
   "Catalog the contents of an filesystem path."
   [ root-path catalog-name ]
-  (let [catalog-id (catalog/ensure-catalog catalog-name root-path "fs")
-        root (clojure.java.io/file root-path)
-        catalog-files (catalog/get-catalog-files catalog-id)]
-    (doseq [f (filter #(.isFile %) (file-seq root))]
-      (catalog/catalog-file catalog-files catalog-id (file-info root f)))))
+
+  (let [root (clojure.java.io/file root-path)]
+    (catalog/catalog-files (catalog/ensure-catalog catalog-name root-path "fs")
+                           (map #(file-info root %) (filter #(.isFile %) (file-seq root))))))
 
 (def subcommands
   #^{:doc "Filesystem subcommands"}
