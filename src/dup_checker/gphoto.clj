@@ -57,15 +57,14 @@
   (query-scalar (sfm/db)
                 [(str "SELECT refresh_token FROM google_jwt")]))
 
-(defn- store-google-refresh-token [ refresh-token  ]
+(defn- store-google-token [ jwt ]
   (jdbc/execute! (sfm/db)
                  [(str "MERGE INTO google_jwt "
                        "  USING (VALUES (?)) new_jwt (refresh_token)"
                        "  ON true "
                        "  WHEN MATCHED THEN UPDATE SET google_jwt.refresh_token=new_jwt.refresh_token"
                        "  WHEN NOT MATCHED THEN INSERT (refresh_token) VALUES (new_jwt.refresh_token) ")
-                  refresh-token])
-  refresh-token)
+                  (:refresh_token jwt)]))
 
 (defn cmd-gphoto-logout []
   (jdbc/delete! (sfm/db) :google_jwt []))
@@ -75,11 +74,12 @@
     (or (load-google-refresh-token)
         (if-let [ authorization-code (gphoto-authenticate oauth) ]
           (if-let [ jwt (gphoto-exchange-code-for-jwt oauth authorization-code) ]
-            (store-google-refresh-token (:access_token jwt))
+            (store-google-token jwt)
             (fail "Cannot acquire Google JWT from authorization code."))
           (fail "Google authentication failed")))))
 
-(defn- gphoto-refresh-token [ oauth refresh-token ]
+(defn- gphoto-request-access-token [ oauth refresh-token ]
+  (log/info "Requesting access token")
   (http-post-json
    (format "%s?client_id=%s&client_secret=%s&refresh_token=%s&grant_type=refresh_token"
            (:token_uri oauth)
@@ -87,20 +87,39 @@
            (:client_secret oauth)
            refresh-token)))
 
-(defn- cmd-gphoto-api-token []
+(defn- gphoto-ensure-authenticated []
   (let [oauth (:installed (try-parse-json (slurp "google-oauth.json")))]
-    (log/spy :info (gphoto-refresh-token oauth (or (load-google-refresh-token)
-                                                   (fail "Not authenticated to Google"))))))
+    (assoc oauth :refresh-token (or (load-google-refresh-token)
+                                    (fail "Not authenticated to Google")))))
+
+(def hysterisis 60)
+
+(defn- gphoto-ensure-access-token [ authenticated-oauth ]
+  (if (or (not (:expires-on authenticated-oauth))
+          (.isAfter
+           (.plusSeconds (java.time.LocalDateTime/now) hysterisis)
+           (:expires-on authenticated-oauth)))
+    (let [access-token (gphoto-request-access-token authenticated-oauth (:refresh-token authenticated-oauth))]
+      (-> authenticated-oauth
+          (merge access-token)
+          (assoc :expires-on (.plusSeconds (java.time.LocalDateTime/now) (:expires_in access-token)))))
+    authenticated-oauth))
+
+(defn- cmd-gphoto-api-token []
+  (pprint/pprint (gphoto-ensure-access-token (gphoto-ensure-authenticated))))
 
 (defn- get-gphoto-paged-stream [ url items-key ]
-  (letfn [(query-page [ page-token ]
-            (let [ response (http-get-json (str url (when page-token
-                                                      (str "?pageToken=" page-token))))]
-              (if-let [ next-page-token (:nextPageToken response)]
-                (lazy-seq (concat (items-key response)
-                                  (query-page next-page-token)))
-                (items-key response))))]
-    (query-page nil)))
+  (let [ oauth (atom (gphoto-ensure-authenticated))]
+    (letfn [(query-page [ page-token ]
+              (swap! oauth gphoto-ensure-access-token)
+              (let [ response (http-get-json (str url (when page-token
+                                                        (str "?pageToken=" page-token)))
+                                             (:access_token @oauth))]
+                (if-let [ next-page-token (:nextPageToken response)]
+                  (lazy-seq (concat (items-key response)
+                                    (query-page next-page-token)))
+                  (items-key response))))]
+      (query-page nil))))
 
 (defn- get-gphoto-albums [ ]
   (get-gphoto-paged-stream "https://photoslibrary.googleapis.com/v1/albums" :albums))
