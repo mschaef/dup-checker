@@ -87,34 +87,39 @@
            (:client_secret oauth)
            refresh-token)))
 
-(defn- gphoto-ensure-authenticated []
+(defn- gphoto-ensure-creds []
   (let [oauth (:installed (try-parse-json (slurp "google-oauth.json")))]
     (assoc oauth :refresh-token (or (load-google-refresh-token)
                                     (fail "Not authenticated to Google")))))
 
 (def hysterisis 60)
 
-(defn- gphoto-ensure-access-token [ authenticated-oauth ]
-  (if (or (not (:expires-on authenticated-oauth))
+(defn- gphoto-ensure-access-token [ creds ]
+  (if (or (not (:expires-on creds))
           (.isAfter
            (.plusSeconds (java.time.LocalDateTime/now) hysterisis)
-           (:expires-on authenticated-oauth)))
-    (let [access-token (gphoto-request-access-token authenticated-oauth (:refresh-token authenticated-oauth))]
-      (-> authenticated-oauth
+           (:expires-on creds)))
+    (let [access-token (gphoto-request-access-token creds (:refresh-token creds))]
+      (-> creds
           (merge access-token)
           (assoc :expires-on (.plusSeconds (java.time.LocalDateTime/now) (:expires_in access-token)))))
-    authenticated-oauth))
+    creds))
+
+(defn- gphoto-auth-provider [ ]
+  (let [ gphoto-creds (atom (gphoto-ensure-creds)) ]
+    (fn []
+      (swap! gphoto-creds gphoto-ensure-access-token)
+      (:access_token @gphoto-creds))))
 
 (defn- cmd-gphoto-api-token []
-  (pprint/pprint (gphoto-ensure-access-token (gphoto-ensure-authenticated))))
+  (pprint/pprint (gphoto-ensure-access-token (gphoto-ensure-creds))))
 
 (defn- get-gphoto-paged-stream [ url items-key ]
-  (let [ oauth (atom (gphoto-ensure-authenticated))]
+  (let [ gphoto-auth (gphoto-auth-provider)]
     (letfn [(query-page [ page-token ]
-              (swap! oauth gphoto-ensure-access-token)
               (let [ response (http-get-json (str url (when page-token
                                                         (str "?pageToken=" page-token)))
-                                             (:access_token @oauth))]
+                                             gphoto-auth)]
                 (if-let [ next-page-token (:nextPageToken response)]
                   (lazy-seq (concat (items-key response)
                                     (query-page next-page-token)))

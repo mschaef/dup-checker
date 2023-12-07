@@ -21,8 +21,9 @@
   ([ req-fn url ]
    (http-request-json* req-fn url nil))
 
-  ([ req-fn url bearer-token ]
-   (let [response (req-fn url (if bearer-token
+  ([ req-fn url auth ]
+   (let [bearer-token (if (fn? auth) (auth) auth)
+         response (req-fn url (if bearer-token
                                 {:headers
                                  {:Authorization (str "Bearer " bearer-token)}}
                                 {}))]
