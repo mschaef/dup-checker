@@ -69,8 +69,11 @@
 (defn cmd-gphoto-logout []
   (jdbc/delete! (sfm/db) :google_jwt []))
 
+(defn- gphoto-oauth-config []
+  (:installed (try-parse-json (slurp "google-oauth.json"))))
+
 (defn cmd-gphoto-login []
-  (let [oauth (:installed (try-parse-json (slurp "google-oauth.json")))]
+  (let [oauth (gphoto-oauth-config)]
     (or (load-google-refresh-token)
         (if-let [ authorization-code (gphoto-authenticate oauth) ]
           (if-let [ jwt (gphoto-exchange-code-for-jwt oauth authorization-code) ]
@@ -88,7 +91,7 @@
            refresh-token)))
 
 (defn- gphoto-ensure-creds []
-  (let [oauth (:installed (try-parse-json (slurp "google-oauth.json")))]
+  (let [oauth (gphoto-oauth-config)]
     (assoc oauth :refresh-token (or (load-google-refresh-token)
                                     (fail "Not authenticated to Google")))))
 
