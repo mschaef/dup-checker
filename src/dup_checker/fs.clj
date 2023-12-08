@@ -3,12 +3,8 @@
         dup-checker.util)
   (:require [clojure.pprint :as pprint]
             [taoensso.timbre :as log]
-            [again.core :as again]
-            [clj-commons.digest :as digest]
+            [clojure.java.io :as io]
             [dup-checker.catalog :as catalog]))
-
-;; Times in msec
-(def retry-policy [ 0 5000 10000 15000 ])
 
 (defn- file-info [ root f ]
   (let [path (.getCanonicalPath f)]
@@ -18,10 +14,7 @@
      :last-modified-on (java.util.Date. (.lastModified f))
      :name (.substring path (+ 1 (count (.getCanonicalPath root))))
      :size (.length f)
-     :md5-digest (delay
-                   (again/with-retries retry-policy
-                     ;; Retry to accomodate potential I/O errors.
-                     (digest/md5 f)))}))
+     :data-stream-fn #(io/input-stream f)}))
 
 (defn- cmd-catalog-fs-files
   "Catalog the contents of an filesystem path."

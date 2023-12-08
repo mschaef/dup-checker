@@ -3,6 +3,8 @@
         sql-file.sql-util)
   (:require [clojure.pprint :as pprint]
             [taoensso.timbre :as log]
+            [clj-commons.digest :as digest]
+            [again.core :as again]
             [clojure.java.jdbc :as jdbc]
             [sql-file.middleware :as sfm]))
 
@@ -68,6 +70,14 @@
     "zip" "svg" "tsp" "mod" "avi" "mp4" "xcf" "tif" "bmp"
     "mp3" "pdf" "arw" "ithmb" "gif" "nef" "png" "jpg"})
 
+;; Times in msec
+(def retry-policy [ 0 5000 10000 15000 ])
+
+(defn- file-md5-digest [ file-info ]
+  (again/with-retries retry-policy
+    (with-open [ r ((:data-stream-fn file-info)) ]
+      (digest/md5 r))))
+
 (defn- catalog-file [ catalog-files catalog-id file-info ]
   (cond
     (catalog-files (:name file-info))
@@ -86,7 +96,7 @@
                      :extension (.toLowerCase (:extension file-info))
                      :size (:size file-info)
                      :last_modified_on (:last-modified-on file-info)
-                     :md5_digest (force (:md5-digest file-info))}))))
+                     :md5_digest (file-md5-digest file-info)}))))
 
 (defn catalog-files [ catalog-id file-infos ]
   (let [catalog-files (get-catalog-files catalog-id)]
