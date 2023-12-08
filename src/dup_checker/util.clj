@@ -17,18 +17,17 @@
    (pprint/print-table ks rows)
    (println "n=" (count rows))))
 
-(defn- http-request-json*
-  ([ req-fn url ]
-   (http-request-json* req-fn url nil))
-
-  ([ req-fn url auth ]
-   (let [bearer-token (if (fn? auth) (auth) auth)
-         response (req-fn url (if bearer-token
-                                {:headers
-                                 {:Authorization (str "Bearer " bearer-token)}}
-                                {}))]
-     (and (= 200 (:status response))
-          (playbook/try-parse-json (:body response))))))
+(defn- http-request-json* [ req-fn url & {:keys [ auth as-binary-stream ]} ]
+  (let [bearer-token (if (fn? auth) (auth) auth)
+        response (req-fn url
+                         (cond-> {}
+                           bearer-token (assoc :headers
+                                               {:Authorization (str "Bearer " bearer-token)})
+                           as-binary-stream (assoc :as :stream)))]
+    (and (= 200 (:status response))
+         (if as-binary-stream
+           (:body-response)
+           (playbook/try-parse-json (:body response))))))
 
 (def http-get-json (partial http-request-json* http/get))
 (def http-post-json (partial http-request-json* http/post))

@@ -122,7 +122,7 @@
     (letfn [(query-page [ page-token ]
               (let [ response (http-get-json (str url (when page-token
                                                         (str "?pageToken=" page-token)))
-                                             gphoto-auth)]
+                                             :auth gphoto-auth)]
                 (if-let [ next-page-token (:nextPageToken response)]
                   (lazy-seq (concat (items-key response)
                                     (query-page next-page-token)))
