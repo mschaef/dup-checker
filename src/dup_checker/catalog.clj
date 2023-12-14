@@ -68,7 +68,7 @@
     "dng" "rtf" "fig" "psd" "jpeg" "hdr" "mpeg" "mpg" "xmp"
     "wma" "xpm" "moi" "mom" "sbr" "mov" "dvi" "tga" "tgz"
     "zip" "svg" "tsp" "mod" "avi" "mp4" "xcf" "tif" "bmp"
-    "mp3" "pdf" "arw" "ithmb" "gif" "nef" "png" "jpg"})
+    "mp3" "pdf" "arw" "ithmb" "gif" "nef" "png" "jpg" "heic"})
 
 ;; Times in msec
 (def retry-policy [ 0 5000 10000 15000 ])
