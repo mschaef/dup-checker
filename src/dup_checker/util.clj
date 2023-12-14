@@ -26,7 +26,7 @@
                            as-binary-stream (assoc :as :stream)))]
     (and (= 200 (:status response))
          (if as-binary-stream
-           (:body-response)
+           (:body response)
            (playbook/try-parse-json (:body response))))))
 
 (def http-get-json (partial http-request-json* http/get))

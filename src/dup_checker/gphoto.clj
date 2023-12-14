@@ -11,7 +11,8 @@
             [ring.util.response :as ring]
             [clojure.core.async :as async]
             [sql-file.middleware :as sfm]
-            [clojure.java.jdbc :as jdbc]))
+            [clojure.java.jdbc :as jdbc]
+            [dup-checker.catalog :as catalog]))
 
 (defn- request-google-authorization [ oauth ]
   (browse/browse-url
@@ -149,10 +150,31 @@
   (doseq [ item (get-gphoto-media-items) ]
     (pprint/pprint item)))
 
+(defn- gphoto-info [ gphoto-auth p ]
+  {:full-path (:id p)
+   :extension (get-file-extension (java.io.File. (:filename p)))
+   :last-modified-on (current-time)
+   :name (:filename p)
+   :size -1
+   :data-stream-fn #(http-get-json (:baseUrl p)
+                                   :auth gphoto-auth
+                                   :as-binary-stream true)})
+
+(defn- cmd-catalog
+  "Catalog the contents of the gphoto album."
+
+  [ catalog-name ]
+
+  (let [ gphoto-auth (gphoto-auth-provider) ]
+    (catalog/catalog-files
+     (catalog/ensure-catalog catalog-name "gphoto" "gphoto")
+     (map (partial gphoto-info gphoto-auth) (get-gphoto-media-items)))))
+
 (def subcommands
   #^{:doc "Google Photo subcommands"}
   {"login" #'cmd-gphoto-login
    "logout" #'cmd-gphoto-logout
    "api-token" #'cmd-gphoto-api-token
    "lsa" #'cmd-list-gphoto-albums
-   "lsmi" #'cmd-list-gphoto-media-items})
+   "lsmi" #'cmd-list-gphoto-media-items
+   "catalog" #'cmd-catalog})

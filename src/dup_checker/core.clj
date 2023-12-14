@@ -101,7 +101,7 @@
   {:name (or (config-property "db.subname")
              (get-in config [:db :subname] "dup-checker"))
    :schema-path [ "sql/" ]
-   :schemas [[ "dup-checker" 2 ]]})
+   :schemas [[ "dup-checker" 3 ]]})
 
 
 (defn -main [& args] ;; TODO: Does playbook need a standard main? Or wrapper?
