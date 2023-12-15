@@ -118,42 +118,43 @@
 (defn- cmd-gphoto-api-token []
   (pprint/pprint (gphoto-ensure-access-token (gphoto-ensure-creds))))
 
-(defn- get-gphoto-paged-stream [ url items-key ]
-  (let [ gphoto-auth (gphoto-auth-provider)]
-    (letfn [(query-page [ page-token ]
-              (let [ response (http-get-json (str url (when page-token
-                                                        (str "?pageToken=" page-token)))
-                                             :auth gphoto-auth)]
-                (if-let [ next-page-token (:nextPageToken response)]
-                  (lazy-seq (concat (items-key response)
-                                    (query-page next-page-token)))
-                  (items-key response))))]
-      (query-page nil))))
+(defn- get-gphoto-paged-stream [ gphoto-auth url items-key ]
+  (letfn [(query-page [ page-token ]
+            (let [ response (http-get-json (str url (when page-token
+                                                      (str "?pageToken=" page-token)))
+                                           :auth gphoto-auth)]
+              (if-let [ next-page-token (:nextPageToken response)]
+                (lazy-seq (concat (items-key response)
+                                  (query-page next-page-token)))
+                (items-key response))))]
+    (query-page nil)))
 
-(defn- get-gphoto-albums [ ]
-  (get-gphoto-paged-stream "https://photoslibrary.googleapis.com/v1/albums" :albums))
+(defn- get-gphoto-albums [ gphoto-auth ]
+  (get-gphoto-paged-stream gphoto-auth "https://photoslibrary.googleapis.com/v1/albums" :albums))
 
-(defn- get-gphoto-media-items [ ]
-  (get-gphoto-paged-stream "https://photoslibrary.googleapis.com/v1/mediaItems" :mediaItems))
+(defn- get-gphoto-media-items [ gphoto-auth ]
+  (get-gphoto-paged-stream gphoto-auth "https://photoslibrary.googleapis.com/v1/mediaItems" :mediaItems))
 
 (defn- cmd-list-gphoto-albums
   "List available Google Photo Albums"
 
   []
-  (doseq [ album (get-gphoto-albums) ]
-    (pprint/pprint album)))
+  (let [ gphoto-auth (gphoto-auth-provider)]
+    (doseq [ album (get-gphoto-albums gphoto-auth) ]
+      (pprint/pprint album))))
 
 (defn- cmd-list-gphoto-media-items
   "List available Google Photo media items."
 
   []
-  (doseq [ item (get-gphoto-media-items) ]
-    (pprint/pprint item)))
+  (let [ gphoto-auth (gphoto-auth-provider)]
+    (doseq [ item (get-gphoto-media-items gphoto-auth) ]
+      (pprint/pprint item))))
 
 (defn- gphoto-info [ gphoto-auth p ]
   {:full-path (:id p)
    :extension (get-file-extension (java.io.File. (:filename p)))
-   :last-modified-on (current-time)
+   :last-modified-on (java.time.Instant/parse (get-in  p [:mediaMetadata :creationTime]))
    :name (:filename p)
    :size -1
    :data-stream-fn #(http-get-json (:baseUrl p)

@@ -73,6 +73,7 @@
 ;; Times in msec
 (def retry-policy [ 0 5000 10000 15000 ])
 
+
 (defn- file-md5-digest [ file-info ]
   (again/with-retries retry-policy
     (with-open [ r ((:data-stream-fn file-info)) ]
