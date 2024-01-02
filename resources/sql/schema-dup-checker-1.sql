@@ -1,3 +1,4 @@
+
 CREATE CACHED TABLE catalog_type (
   catalog_type_id TINYINT IDENTITY,
   catalog_type VARCHAR(16)

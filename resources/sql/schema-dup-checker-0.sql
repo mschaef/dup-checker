@@ -1,3 +1,4 @@
+
 CREATE CACHED TABLE catalog (
   catalog_id BIGINT IDENTITY,
   name VARCHAR(32) UNIQUE,
