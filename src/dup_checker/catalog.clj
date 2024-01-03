@@ -69,7 +69,7 @@
     "wma" "xpm" "moi" "mom" "sbr" "mov" "dvi" "tga"
     "svg" "tsp" "mod" "avi" "mp4" "xcf" "tif" "bmp"
     "mp3" "pdf" "arw" "ithmb" "gif" "nef" "png" "jpg"
-    "mts"})
+    "mts" "heic"})
 
 ;; Times in msec
 (def retry-policy [ 0 5000 10000 15000 ])

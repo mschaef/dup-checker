@@ -104,16 +104,19 @@
            (.plusSeconds (java.time.LocalDateTime/now) hysterisis)
            (:expires-on creds)))
     (let [access-token (gphoto-request-access-token creds (:refresh-token creds))]
+      (log/info "Access token acquired successfully")
       (-> creds
           (merge access-token)
           (assoc :expires-on (.plusSeconds (java.time.LocalDateTime/now) (:expires_in access-token)))))
     creds))
 
 (defn- gphoto-auth-provider [ ]
-  (let [ gphoto-creds (atom (gphoto-ensure-creds)) ]
-    (fn []
-      (swap! gphoto-creds gphoto-ensure-access-token)
-      (:access_token @gphoto-creds))))
+  (let [ provider-fn (let [ gphoto-creds (atom (gphoto-ensure-creds)) ]
+                       (fn []
+                         (swap! gphoto-creds gphoto-ensure-access-token)
+                         (:access_token @gphoto-creds)))]
+    (provider-fn)
+    provider-fn))
 
 (defn- cmd-gphoto-api-token []
   (pprint/pprint (gphoto-ensure-access-token (gphoto-ensure-creds))))
@@ -138,6 +141,16 @@
 (defn- get-gphoto-media-items [ gphoto-auth ]
   (get-gphoto-paged-stream gphoto-auth "https://photoslibrary.googleapis.com/v1/mediaItems" :mediaItems 100))
 
+(defn- gphoto-info [ gphoto-auth p ]
+  {:full-path (:id p)
+   :extension (get-file-extension (java.io.File. (:filename p)))
+   :last-modified-on (java.time.Instant/parse (get-in  p [:mediaMetadata :creationTime]))
+   :name (:filename p)
+   :size -1
+   :data-stream-fn #(http-get-json (log/spy :info (:baseUrl p))
+                                   :auth gphoto-auth
+                                   :as-binary-stream true)})
+
 (defn- cmd-list-gphoto-albums
   "List available Google Photo Albums"
 
@@ -154,20 +167,9 @@
     (doseq [ item (get-gphoto-media-items gphoto-auth) ]
       (pprint/pprint item))))
 
-(defn- gphoto-info [ gphoto-auth p ]
-  {:full-path (:id p)
-   :extension (get-file-extension (java.io.File. (:filename p)))
-   :last-modified-on (java.time.Instant/parse (get-in  p [:mediaMetadata :creationTime]))
-   :name (:filename p)
-   :size -1
-   :data-stream-fn #(http-get-json (:baseUrl p)
-                                   :auth gphoto-auth
-                                   :as-binary-stream true)})
-
-
 (defn get-snapshot-item-ids [ ]
   (set (map :gphoto_id (query-all (sfm/db)
-                             "SELECT gphoto_id FROM gphoto_media_item"))))
+                                  "SELECT gphoto_id FROM gphoto_media_item"))))
 
 (defn- snapshot-item [ existing-item-ids media-item ]
   (cond
@@ -193,9 +195,15 @@
   [ ]
 
   (let [existing-item-ids (get-snapshot-item-ids)
-        media-items (get-gphoto-media-items (gphoto-auth-provider))]
+        media-items (take 1000 (get-gphoto-media-items (gphoto-auth-provider)))]
     (doseq [ media-item media-items ]
       (snapshot-item existing-item-ids media-item))))
+
+(defn- get-snapshot-media-items []
+  (query-all (sfm/db)
+             [(str "SELECT entry_id, gphoto_id, base_url, name, creation_time"
+                   "  FROM gphoto_media_item"
+                   " ORDER BY creation_time")]))
 
 (defn- cmd-gphoto-snapshot-list
   "List the current gphoto snapshot."
@@ -208,12 +216,42 @@
            :gphoto-id (:gphoto_id media-item)
            :name (:name media-item)
            :creation-time (:creation_time media-item)})
-        (query-all (sfm/db)
-                   [(str "SELECT entry_id, gphoto_id, name, creation_time"
-                         "  FROM gphoto_media_item"
-                         " ORDER BY creation_time")]))))
+        (get-snapshot-media-items))))
 
-(defn- cmd-catalog
+(def df (java.text.SimpleDateFormat. "yyyy/MM/dd"))
+
+(defn- mkdir-if-needed [ path ]
+  (let [ f (java.io.File. path) ]
+    (when (not (.exists f))
+      (log/info "Creating target directory: " path)
+      (.mkdirs f))))
+
+(defn- copy-if-missing [ gphoto-auth media-item target-file ]
+  (let [ f (java.io.File. target-file) ]
+    (if (.exists f)
+      (log/info "File already exists:" target-file)
+      (do
+        (log/info "Copying file:" target-file)
+        (with-open [ in (http-get-json (:base_url media-item)
+                                       :auth gphoto-auth
+                                       :as-binary-stream true) ]
+          (clojure.java.io/copy in f))))))
+
+(defn- backup-media-item [ gphoto-auth base-path media-item ]
+  (let [ target-path (str base-path "/" (.format df (:creation_time media-item)))]
+    (mkdir-if-needed target-path)
+    (copy-if-missing gphoto-auth media-item (str target-path "/" (:name media-item)))))
+
+(defn- cmd-gphoto-snapshot-backup
+  "Backup the current gphoto snapshot to a local filesystem directory."
+
+  [ base-path ]
+
+  (let [ gphoto-auth (gphoto-auth-provider) ]
+    (doseq [ media-item (get-snapshot-media-items)]
+      (backup-media-item gphoto-auth base-path media-item))))
+
+(defn- cmd-gphoto-catalog
   "Catalog the contents of the gphoto album."
 
   [ catalog-name ]
@@ -221,13 +259,14 @@
   (let [ gphoto-auth (gphoto-auth-provider) ]
     (catalog/catalog-files
      (catalog/ensure-catalog catalog-name "gphoto" "gphoto")
-     (map (partial gphoto-info gphoto-auth) (get-gphoto-media-items)))))
+     (map (partial gphoto-info gphoto-auth) (get-gphoto-media-items gphoto-auth)))))
 
-(def snapshot-subcommands
+
+(def gphoto-snapshot-subcommands
   #^{:doc "Snapshot subcommands"}
   {"update" #'cmd-gphoto-snapshot-update
    "ls" #'cmd-gphoto-snapshot-list
-   })
+   "backup" #'cmd-gphoto-snapshot-backup})
 
 (def subcommands
   #^{:doc "Google Photo subcommands"}
@@ -236,5 +275,5 @@
    "api-token" #'cmd-gphoto-api-token
    "lsa" #'cmd-list-gphoto-albums
    "lsmi" #'cmd-list-gphoto-media-items
-   "snapshot" snapshot-subcommands
-   "catalog" #'cmd-catalog})
+   "snapshot" gphoto-snapshot-subcommands
+   "catalog" #'cmd-gphoto-catalog})
