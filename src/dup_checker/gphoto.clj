@@ -187,7 +187,7 @@
                      :creation_time (java.time.Instant/parse (get-in media-item [:mediaMetadata :creationTime]))
                      :media_metadata (pr-str (:mediaMetadata media-item))}))))
 
-(defn- cmd-gphoto-snapshot
+(defn- cmd-gphoto-snapshot-update
   "Update the current gphoto snapshot."
 
   [ ]
@@ -196,6 +196,22 @@
         media-items (get-gphoto-media-items (gphoto-auth-provider))]
     (doseq [ media-item media-items ]
       (snapshot-item existing-item-ids media-item))))
+
+(defn- cmd-gphoto-snapshot-list
+  "List the current gphoto snapshot."
+
+  [ ]
+
+  (table
+   (map (fn [ media-item ]
+          {:entry-id (:entry_id media-item)
+           :gphoto-id (:gphoto_id media-item)
+           :name (:name media-item)
+           :creation-time (:creation_time media-item)})
+        (query-all (sfm/db)
+                   [(str "SELECT entry_id, gphoto_id, name, creation_time"
+                         "  FROM gphoto_media_item"
+                         " ORDER BY creation_time")]))))
 
 (defn- cmd-catalog
   "Catalog the contents of the gphoto album."
@@ -207,6 +223,12 @@
      (catalog/ensure-catalog catalog-name "gphoto" "gphoto")
      (map (partial gphoto-info gphoto-auth) (get-gphoto-media-items)))))
 
+(def snapshot-subcommands
+  #^{:doc "Snapshot subcommands"}
+  {"update" #'cmd-gphoto-snapshot-update
+   "ls" #'cmd-gphoto-snapshot-list
+   })
+
 (def subcommands
   #^{:doc "Google Photo subcommands"}
   {"login" #'cmd-gphoto-login
@@ -214,5 +236,5 @@
    "api-token" #'cmd-gphoto-api-token
    "lsa" #'cmd-list-gphoto-albums
    "lsmi" #'cmd-list-gphoto-media-items
-   "snapshot" #'cmd-gphoto-snapshot
+   "snapshot" snapshot-subcommands
    "catalog" #'cmd-catalog})
