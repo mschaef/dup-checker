@@ -32,12 +32,14 @@
 (def http-get-json (partial http-request-json* http/get))
 (def http-post-json (partial http-request-json* http/post))
 
-(defn get-file-extension [ f ]
-  (let [name (.getName f)
-        sep-index (.lastIndexOf name ".")]
+(defn get-filename-extension [ name ]
+  (let [sep-index (.lastIndexOf name ".")]
     (if (< sep-index 0)
       name
       (.substring name (+ 1 sep-index)))))
+
+(defn get-file-extension [ f ]
+  (get-filename-extension (.getName f)))
 
 (defn current-hostname []
   (.getCanonicalHostName (java.net.InetAddress/getLocalHost)))

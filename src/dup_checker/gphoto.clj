@@ -142,7 +142,7 @@
   "List available Google Photo Albums"
 
   []
-  (let [ gphoto-auth (gphoto-auth-provider)]
+  (let [ gphoto-auth (gphoto-auth-provider) ]
     (doseq [ album (get-gphoto-albums gphoto-auth) ]
       (pprint/pprint album))))
 
@@ -150,7 +150,7 @@
   "List available Google Photo media items."
 
   []
-  (let [ gphoto-auth (gphoto-auth-provider)]
+  (let [ gphoto-auth (gphoto-auth-provider) ]
     (doseq [ item (get-gphoto-media-items gphoto-auth) ]
       (pprint/pprint item))))
 
@@ -163,6 +163,39 @@
    :data-stream-fn #(http-get-json (:baseUrl p)
                                    :auth gphoto-auth
                                    :as-binary-stream true)})
+
+
+(defn get-snapshot-item-ids [ ]
+  (set (map :gphoto_id (query-all (sfm/db)
+                             "SELECT gphoto_id FROM gphoto_media_item"))))
+
+(defn- snapshot-item [ existing-item-ids media-item ]
+  (cond
+    (existing-item-ids (:id media-item))
+    (log/info "Item already in snapshot:" (:id media-item))
+
+    :else
+    (do
+      (log/info "Adding item to snapshot:" (:id media-item))
+      (jdbc/insert! (sfm/db)
+                    :gphoto_media_item
+                    {:gphoto_id (:id media-item)
+                     :name (:filename media-item)
+                     :extension (.toLowerCase (get-filename-extension (:filename media-item)))
+                     :mime_type (:mimeType media-item)
+                     :base_url (:baseUrl media-item)
+                     :creation_time (java.time.Instant/parse (get-in media-item [:mediaMetadata :creationTime]))
+                     :media_metadata (pr-str (:mediaMetadata media-item))}))))
+
+(defn- cmd-gphoto-snapshot
+  "Update the current gphoto snapshot."
+
+  [ ]
+
+  (let [existing-item-ids (get-snapshot-item-ids)
+        media-items (get-gphoto-media-items (gphoto-auth-provider))]
+    (doseq [ media-item media-items ]
+      (snapshot-item existing-item-ids media-item))))
 
 (defn- cmd-catalog
   "Catalog the contents of the gphoto album."
@@ -181,4 +214,5 @@
    "api-token" #'cmd-gphoto-api-token
    "lsa" #'cmd-list-gphoto-albums
    "lsmi" #'cmd-list-gphoto-media-items
+   "snapshot" #'cmd-gphoto-snapshot
    "catalog" #'cmd-catalog})
