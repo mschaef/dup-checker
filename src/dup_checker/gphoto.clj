@@ -205,7 +205,7 @@
   (let [ gphoto-auth (gphoto-auth-provider) ]
     (catalog/catalog-files
      (catalog/ensure-catalog catalog-name "gphoto" "gphoto")
-     (map (partial gphoto-info gphoto-auth) (get-gphoto-media-items)))))
+     (map (partial gphoto-info gphoto-auth) (get-gphoto-media-items gphoto-auth)))))
 
 (def subcommands
   #^{:doc "Google Photo subcommands"}
