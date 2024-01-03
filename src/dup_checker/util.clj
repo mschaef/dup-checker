@@ -14,7 +14,8 @@
    (table (keys (first rows)) rows))
 
   ([ ks rows ]
-   (pprint/print-table ks rows)
+   (doseq [ p (partition-all 500 rows)]
+     (pprint/print-table ks p))
    (println "n=" (count rows))))
 
 (defn- http-request-json* [ req-fn url & {:keys [ auth as-binary-stream ]} ]
