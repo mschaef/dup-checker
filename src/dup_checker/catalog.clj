@@ -64,11 +64,13 @@
                               catalog-id]))))
 
 (def image-extensions
-  #{"vob" "m4p" "wmv" "xbm" "tar" "gz" "lrcat" "pcx"
-    "dng" "rtf" "fig" "psd" "jpeg" "hdr" "mpeg" "mpg" "xmp"
-    "wma" "xpm" "moi" "mom" "sbr" "mov" "dvi" "tga" "tgz"
-    "zip" "svg" "tsp" "mod" "avi" "mp4" "xcf" "tif" "bmp"
-    "mp3" "pdf" "arw" "ithmb" "gif" "nef" "png" "jpg"})
+  #{"vob" "m4p" "wmv" "xbm" "lrcat" "pcx"
+    "dng"  "fig" "psd" "jpeg" "hdr" "mpeg" "mpg" "xmp"
+    "wma" "xpm" "moi" "mom" "sbr" "mov" "dvi" "tga"
+    "svg" "tsp" "mod" "avi" "mp4" "xcf" "tif" "bmp"
+    "mp3" "pdf" "arw" "ithmb" "gif" "nef" "png" "jpg"
+    ;; "tgz" "tar" "gz" "zip" "rtf
+    })
 
 ;; Times in msec
 (def retry-policy [ 0 5000 10000 15000 ])
