@@ -118,10 +118,13 @@
 (defn- cmd-gphoto-api-token []
   (pprint/pprint (gphoto-ensure-access-token (gphoto-ensure-creds))))
 
-(defn- get-gphoto-paged-stream [ gphoto-auth url items-key ]
+
+(defn- get-gphoto-paged-stream [ gphoto-auth url items-key page-size ]
   (letfn [(query-page [ page-token ]
-            (let [ response (http-get-json (str url (when page-token
-                                                      (str "?pageToken=" page-token)))
+            (let [ response (http-get-json (str url
+                                                (str "?pageSize=" page-size)
+                                                (when page-token
+                                                  (str "&pageToken=" page-token)))
                                            :auth gphoto-auth)]
               (if-let [ next-page-token (:nextPageToken response)]
                 (lazy-seq (concat (items-key response)
@@ -130,10 +133,10 @@
     (query-page nil)))
 
 (defn- get-gphoto-albums [ gphoto-auth ]
-  (get-gphoto-paged-stream gphoto-auth "https://photoslibrary.googleapis.com/v1/albums" :albums))
+  (get-gphoto-paged-stream gphoto-auth "https://photoslibrary.googleapis.com/v1/albums" :albums 50))
 
 (defn- get-gphoto-media-items [ gphoto-auth ]
-  (get-gphoto-paged-stream gphoto-auth "https://photoslibrary.googleapis.com/v1/mediaItems" :mediaItems))
+  (get-gphoto-paged-stream gphoto-auth "https://photoslibrary.googleapis.com/v1/mediaItems" :mediaItems 50))
 
 (defn- cmd-list-gphoto-albums
   "List available Google Photo Albums"
