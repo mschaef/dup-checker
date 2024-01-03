@@ -261,7 +261,6 @@
      (catalog/ensure-catalog catalog-name "gphoto" "gphoto")
      (map (partial gphoto-info gphoto-auth) (get-gphoto-media-items gphoto-auth)))))
 
-
 (def gphoto-snapshot-subcommands
   #^{:doc "Snapshot subcommands"}
   {"update" #'cmd-gphoto-snapshot-update
