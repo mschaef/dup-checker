@@ -136,7 +136,7 @@
   (get-gphoto-paged-stream gphoto-auth "https://photoslibrary.googleapis.com/v1/albums" :albums 50))
 
 (defn- get-gphoto-media-items [ gphoto-auth ]
-  (get-gphoto-paged-stream gphoto-auth "https://photoslibrary.googleapis.com/v1/mediaItems" :mediaItems 50))
+  (get-gphoto-paged-stream gphoto-auth "https://photoslibrary.googleapis.com/v1/mediaItems" :mediaItems 100))
 
 (defn- cmd-list-gphoto-albums
   "List available Google Photo Albums"
