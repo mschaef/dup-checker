@@ -69,6 +69,7 @@
     "wma" "xpm" "moi" "mom" "sbr" "mov" "dvi" "tga"
     "svg" "tsp" "mod" "avi" "mp4" "xcf" "tif" "bmp"
     "mp3" "pdf" "arw" "ithmb" "gif" "nef" "png" "jpg"
+    "mts"
     ;; "tgz" "tar" "gz" "zip" "rtf
     })
 
