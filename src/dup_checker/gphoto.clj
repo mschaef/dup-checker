@@ -4,7 +4,6 @@
         dup-checker.util)
   (:require [clojure.pprint :as pprint]
             [taoensso.timbre :as log]
-            [clj-http.client :as http]
             [clojure.java.browse :as browse]
             [ring.adapter.jetty :as jetty]
             [ring.middleware.params :as params]
@@ -12,6 +11,7 @@
             [clojure.core.async :as async]
             [sql-file.middleware :as sfm]
             [clojure.java.jdbc :as jdbc]
+            [dup-checker.http :as http]
             [dup-checker.catalog :as catalog]))
 
 (def token-expiry-margin-sec 300)
@@ -47,7 +47,7 @@
       resp)))
 
 (defn- gphoto-exchange-code-for-jwt [ oauth code ]
-  (http-post-json
+  (http/post-json
    (format "%s?client_id=%s&client_secret=%s&redirect_uri=%s&code=%s&grant_type=%s"
            "https://oauth2.googleapis.com/token"
            (:client_id oauth)
@@ -86,7 +86,7 @@
 
 (defn- gphoto-request-access-token [ oauth refresh-token ]
   (log/info "Requesting access token")
-  (http-post-json
+  (http/post-json
    (format "%s?client_id=%s&client_secret=%s&refresh_token=%s&grant_type=refresh_token"
            (:token_uri oauth)
            (:client_id oauth)
@@ -125,7 +125,7 @@
 (defn- get-gphoto-paged-stream [ gphoto-auth url items-key page-size ]
   (letfn [(query-page [ page-token ]
             (let [ response (with-retries
-                              (http-get-json (str url
+                              (http/get-json (str url
                                                   (str "?pageSize=" page-size)
                                                   (when page-token
                                                     (str "&pageToken=" page-token)))
@@ -148,7 +148,7 @@
    :last-modified-on (java.time.Instant/parse (get-in  p [:mediaMetadata :creationTime]))
    :name (:filename p)
    :size -1
-   :data-stream-fn #(http-get-json (:baseUrl p)
+   :data-stream-fn #(http/get-json (:baseUrl p)
                                    :auth gphoto-auth
                                    :as-binary-stream true)})
 
@@ -235,7 +235,7 @@
       (log/info "File already exists:" target-file)
       (do
         (log/info "Copying file:" target-file)
-        (with-open [ in (http-get-json (:base_url media-item)
+        (with-open [ in (http/get-json (:base_url media-item)
                                        :auth gphoto-auth
                                        :as-binary-stream true) ]
           (clojure.java.io/copy in f))))))
