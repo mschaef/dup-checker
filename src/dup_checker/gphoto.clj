@@ -223,6 +223,7 @@
 (def df (java.text.SimpleDateFormat. (format "yyyy%sMM%sdd" path-sep path-sep)))
 
 (defn- mkdir-if-needed [ path ]
+  (assert path)
   (let [ f (java.io.File. path) ]
     (when (not (.exists f))
       (log/info "Creating target directory: " path)
@@ -230,13 +231,15 @@
 
 (defn- backup-media-item [ gphoto-auth media-item ]
   (let [target-file (:target-filename media-item)
-        f (java.io.File. target-file) ]
-    (log/info "Backing up" target-file)
-    (mkdir-if-needed (:target-path media-item))
-    (with-open [ in (http/get-json (:base_url media-item)
-                                   :auth gphoto-auth
-                                   :as-binary-stream true) ]
-      (clojure.java.io/copy in f))))
+        base-url (:base_url media-item)]
+    (with-exception-barrier (str "Downloading image data: " (:gphoto_id media-item))
+      (log/info "Backing up" target-file)
+      (assert (and target-file base-url))
+      (let [ f (java.io.File. target-file) ]
+        (mkdir-if-needed (:target-path media-item))
+        (with-retries
+          (with-open [ in (http/get-json base-url :auth gphoto-auth :as-binary-stream true) ]
+            (clojure.java.io/copy in f)))))))
 
 (defn- add-media-item-local-file-info [ base-path media-item ]
   (let [target-path (str base-path path-sep (.format df (:creation_time media-item)))
@@ -273,11 +276,14 @@
   [ base-path ]
 
   (let [gphoto-auth (gphoto-auth-provider)
-        missing-media-items (remove :local-file-exists?
-                                    (map (partial add-media-item-local-file-info base-path)
-                                         (get-snapshot-media-items)))
-        missing-media-batches (partition-all 50 missing-media-items)]
-    (doseq [ media-items missing-media-batches ]
+        all-media-items (map (partial add-media-item-local-file-info base-path)
+                             (get-snapshot-media-items))
+        present-media-items (filter :local-file-exists? all-media-items)
+        missing-media-items (remove :local-file-exists? all-media-items)]
+    (log/info "Backing up" (count missing-media-items) "item(s) of"
+              (count all-media-items) "in snapshot. (" (count present-media-items)
+              "already present locally.)")
+    (doseq [ media-items (partition-all 50 missing-media-items)]
       (backup-batch gphoto-auth media-items))))
 
 (defn- cmd-gphoto-catalog
