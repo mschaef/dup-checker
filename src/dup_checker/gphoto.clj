@@ -186,7 +186,6 @@
                      :name (:filename media-item)
                      :extension (.toLowerCase (get-filename-extension (:filename media-item)))
                      :mime_type (:mimeType media-item)
-                     :base_url (:baseUrl media-item)
                      :creation_time (java.time.Instant/parse (get-in media-item [:mediaMetadata :creationTime]))
                      :media_metadata (pr-str (:mediaMetadata media-item))}))))
 
@@ -202,7 +201,7 @@
 
 (defn- get-snapshot-media-items []
   (query-all (sfm/db)
-             [(str "SELECT entry_id, gphoto_id, base_url, name, creation_time"
+             [(str "SELECT entry_id, gphoto_id, name, creation_time"
                    "  FROM gphoto_media_item"
                    " ORDER BY creation_time")]))
 
@@ -229,30 +228,57 @@
       (log/info "Creating target directory: " path)
       (.mkdirs f))))
 
-(defn- copy-if-missing [ gphoto-auth media-item target-file ]
-  (let [ f (java.io.File. target-file) ]
-    (if (.exists f)
-      (log/info "File already exists:" target-file)
-      (do
-        (log/info "Copying file:" target-file)
-        (with-open [ in (http/get-json (:base_url media-item)
-                                       :auth gphoto-auth
-                                       :as-binary-stream true) ]
-          (clojure.java.io/copy in f))))))
+(defn- backup-media-item [ gphoto-auth media-item ]
+  (let [target-file (:target-filename media-item)
+        f (java.io.File. target-file) ]
+    (log/info "Backing up" target-file)
+    (mkdir-if-needed (:target-path media-item))
+    (with-open [ in (http/get-json (:base_url media-item)
+                                   :auth gphoto-auth
+                                   :as-binary-stream true) ]
+      (clojure.java.io/copy in f))))
 
-(defn- backup-media-item [ gphoto-auth base-path media-item ]
-  (let [ target-path (str base-path path-sep (.format df (:creation_time media-item)))]
-    (mkdir-if-needed target-path)
-    (copy-if-missing gphoto-auth media-item (str target-path path-sep (:name media-item)))))
+(defn- add-media-item-local-file-info [ base-path media-item ]
+  (let [target-path (str base-path path-sep (.format df (:creation_time media-item)))
+        target-filename (str target-path path-sep (:name media-item))]
+    (merge media-item
+           {:target-path target-path
+            :target-filename target-filename
+            :local-file-exists? (.exists (java.io.File. target-filename))})))
+
+(defn- batch-get-media-items [ gphoto-auth item-ids ]
+  (let [ response (http/get-json (str "https://photoslibrary.googleapis.com/v1/mediaItems:batchGet?"
+                                      (clojure.string/join "&" (map #(str "mediaItemIds=" %) item-ids)))
+                                 :auth gphoto-auth)]
+    (into {}
+          (map (fn [ media-item ]
+                 [(:id media-item) media-item])
+               (map :mediaItem (:mediaItemResults response))))))
+
+
+(defn add-media-item-base-url [ media-info media-item ]
+  (assoc media-item
+         :base_url (get-in media-info [ (:gphoto_id media-item) :baseUrl ])))
+
+(defn- backup-batch [ gphoto-auth media-items ]
+  (let [current-media-info (batch-get-media-items gphoto-auth (map :gphoto_id media-items))
+        media-items (map (partial add-media-item-base-url current-media-info)
+                         media-items)]
+    (doseq [ media-item media-items ]
+      (backup-media-item gphoto-auth media-item))))
 
 (defn- cmd-gphoto-snapshot-backup
   "Backup the current gphoto snapshot to a local filesystem directory."
 
   [ base-path ]
 
-  (let [ gphoto-auth (gphoto-auth-provider) ]
-    (doseq [ media-item (get-snapshot-media-items)]
-      (backup-media-item gphoto-auth base-path media-item))))
+  (let [gphoto-auth (gphoto-auth-provider)
+        missing-media-items (remove :local-file-exists?
+                                    (map (partial add-media-item-local-file-info base-path)
+                                         (get-snapshot-media-items)))
+        missing-media-batches (partition-all 50 missing-media-items)]
+    (doseq [ media-items missing-media-batches ]
+      (backup-batch gphoto-auth media-items))))
 
 (defn- cmd-gphoto-catalog
   "Catalog the contents of the gphoto album."
