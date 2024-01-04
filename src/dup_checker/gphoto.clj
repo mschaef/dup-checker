@@ -250,8 +250,9 @@
             :local-file-exists? (.exists (java.io.File. target-filename))})))
 
 (defn- batch-get-media-items [ gphoto-auth item-ids ]
+  (log/info "Fetching media info for" (count item-ids) "item(s).")
   (let [ response (http/get-json (str "https://photoslibrary.googleapis.com/v1/mediaItems:batchGet?"
-                                      (clojure.string/join "&" (map #(str "mediaItemIds=" %) item-ids)))
+                                      (clojure.string/join "&" (map #(str "mediaItemIds=" %) (set item-ids))))
                                  :auth gphoto-auth)]
     (into {}
           (map (fn [ media-item ]
