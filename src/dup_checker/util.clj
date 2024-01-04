@@ -2,6 +2,7 @@
   (:require [clojure.pprint :as pprint]
             [taoensso.timbre :as log]
             [clj-http.client :as http]
+            [again.core :as again]
             [playbook.core :as playbook]))
 
 (defn fail [ message & args ]
@@ -45,3 +46,9 @@
 (defn current-hostname []
   (.getCanonicalHostName (java.net.InetAddress/getLocalHost)))
 
+;; Times in msec
+(def retry-policy [ 0 5000 10000 15000 ])
+
+(defmacro with-retries [ & forms ]
+  `(again/with-retries retry-policy
+     ~@forms))

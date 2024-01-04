@@ -4,7 +4,6 @@
   (:require [clojure.pprint :as pprint]
             [taoensso.timbre :as log]
             [clj-commons.digest :as digest]
-            [again.core :as again]
             [clojure.java.jdbc :as jdbc]
             [sql-file.middleware :as sfm]))
 
@@ -65,18 +64,14 @@
 
 (def image-extensions
   #{"vob" "m4p" "wmv" "xbm" "lrcat" "pcx"
-    "dng"  "fig" "psd" "jpeg" "hdr" "mpeg" "mpg" "xmp"
+    "dng" "fig" "psd" "jpeg" "hdr" "mpeg" "mpg" "xmp"
     "wma" "xpm" "moi" "mom" "sbr" "mov" "dvi" "tga"
     "svg" "tsp" "mod" "avi" "mp4" "xcf" "tif" "bmp"
     "mp3" "pdf" "arw" "ithmb" "gif" "nef" "png" "jpg"
     "mts" "heic"})
 
-;; Times in msec
-(def retry-policy [ 0 5000 10000 15000 ])
-
-
 (defn- file-md5-digest [ file-info ]
-  (again/with-retries retry-policy
+  (with-retries
     (with-open [ r ((:data-stream-fn file-info)) ]
       (digest/md5 r))))
 

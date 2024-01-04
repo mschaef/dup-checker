@@ -124,11 +124,12 @@
 
 (defn- get-gphoto-paged-stream [ gphoto-auth url items-key page-size ]
   (letfn [(query-page [ page-token ]
-            (let [ response (http-get-json (str url
-                                                (str "?pageSize=" page-size)
-                                                (when page-token
-                                                  (str "&pageToken=" page-token)))
-                                           :auth gphoto-auth)]
+            (let [ response (with-retries
+                              (http-get-json (str url
+                                                  (str "?pageSize=" page-size)
+                                                  (when page-token
+                                                    (str "&pageToken=" page-token)))
+                                             :auth gphoto-auth))]
               (if-let [ next-page-token (:nextPageToken response)]
                 (lazy-seq (concat (items-key response)
                                   (query-page next-page-token)))
@@ -147,7 +148,7 @@
    :last-modified-on (java.time.Instant/parse (get-in  p [:mediaMetadata :creationTime]))
    :name (:filename p)
    :size -1
-   :data-stream-fn #(http-get-json (log/spy :info (:baseUrl p))
+   :data-stream-fn #(http-get-json (:baseUrl p)
                                    :auth gphoto-auth
                                    :as-binary-stream true)})
 
