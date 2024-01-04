@@ -195,7 +195,7 @@
   [ ]
 
   (let [existing-item-ids (get-snapshot-item-ids)
-        media-items (take 1000 (get-gphoto-media-items (gphoto-auth-provider)))]
+        media-items (get-gphoto-media-items (gphoto-auth-provider))]
     (doseq [ media-item media-items ]
       (snapshot-item existing-item-ids media-item))))
 
@@ -218,7 +218,9 @@
            :creation-time (:creation_time media-item)})
         (get-snapshot-media-items))))
 
-(def df (java.text.SimpleDateFormat. "yyyy/MM/dd"))
+(def path-sep java.io.File/separator)
+
+(def df (java.text.SimpleDateFormat. (format "yyyy%sMM%sdd" path-sep path-sep)))
 
 (defn- mkdir-if-needed [ path ]
   (let [ f (java.io.File. path) ]
@@ -238,9 +240,9 @@
           (clojure.java.io/copy in f))))))
 
 (defn- backup-media-item [ gphoto-auth base-path media-item ]
-  (let [ target-path (str base-path "/" (.format df (:creation_time media-item)))]
+  (let [ target-path (str base-path path-sep (.format df (:creation_time media-item)))]
     (mkdir-if-needed target-path)
-    (copy-if-missing gphoto-auth media-item (str target-path "/" (:name media-item)))))
+    (copy-if-missing gphoto-auth media-item (str target-path path-sep (:name media-item)))))
 
 (defn- cmd-gphoto-snapshot-backup
   "Backup the current gphoto snapshot to a local filesystem directory."
