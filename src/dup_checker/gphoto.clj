@@ -14,6 +14,8 @@
             [clojure.java.jdbc :as jdbc]
             [dup-checker.catalog :as catalog]))
 
+(def token-expiry-margin-sec 300)
+
 (defn- request-google-authorization [ oauth ]
   (browse/browse-url
    (format "%s?client_id=%s&redirect_uri=%s&response_type=%s&scope=%s"
@@ -23,7 +25,7 @@
            "code"
            "https://www.googleapis.com/auth/photoslibrary.readonly")))
 
-(defn start-site [ handler ]
+(defn- start-site [ handler ]
   (let [ http-port 8080 ]
     (log/info "Starting Webserver on port" http-port)
     (let [ server (jetty/run-jetty (-> handler
@@ -67,13 +69,13 @@
                        "  WHEN NOT MATCHED THEN INSERT (refresh_token) VALUES (new_jwt.refresh_token) ")
                   (:refresh_token jwt)]))
 
-(defn cmd-gphoto-logout []
+(defn- cmd-gphoto-logout []
   (jdbc/delete! (sfm/db) :google_jwt []))
 
 (defn- gphoto-oauth-config []
   (:installed (try-parse-json (slurp "google-oauth.json"))))
 
-(defn cmd-gphoto-login []
+(defn- cmd-gphoto-login []
   (let [oauth (gphoto-oauth-config)]
     (or (load-google-refresh-token)
         (if-let [ authorization-code (gphoto-authenticate oauth) ]
@@ -96,12 +98,10 @@
     (assoc oauth :refresh-token (or (load-google-refresh-token)
                                     (fail "Not authenticated to Google")))))
 
-(def hysterisis 60)
-
 (defn- gphoto-ensure-access-token [ creds ]
   (if (or (not (:expires-on creds))
           (.isAfter
-           (.plusSeconds (java.time.LocalDateTime/now) hysterisis)
+           (.plusSeconds (java.time.LocalDateTime/now) token-expiry-margin-sec)
            (:expires-on creds)))
     (let [access-token (gphoto-request-access-token creds (:refresh-token creds))]
       (log/info "Access token acquired successfully")

@@ -25,15 +25,16 @@
 
 (defn- s3-blob-info [ s3 bucket-name f ]
   {:full-path (.key f)
-   :extension (get-file-extension (java.io.File. (.key f)))
+   :extension (get-filename-extension (.key f))
    :last-modified-on (.lastModified f)
    :name (.key f)
    :size (.size f)
-   :data-stream-fn #(.getObject s3 (-> (software.amazon.awssdk.services.s3.model.GetObjectRequest/builder)
-                                       (.bucket bucket-name)
-                                       (.key (.key f))
-                                       (.build))
-                                (software.amazon.awssdk.core.sync.ResponseTransformer/toInputStream))})
+   :data-stream-fn
+   #(.getObject s3 (-> (software.amazon.awssdk.services.s3.model.GetObjectRequest/builder)
+                       (.bucket bucket-name)
+                       (.key (.key f))
+                       (.build))
+                (software.amazon.awssdk.core.sync.ResponseTransformer/toInputStream))})
 
 (defn- cmd-catalog-s3-files
   "Catalog the contents of an s3 bucket."
