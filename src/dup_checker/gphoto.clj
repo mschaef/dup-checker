@@ -290,7 +290,8 @@
               (count all-media-items) "in snapshot. (" (count present-media-items)
               "already present locally.)")
     (doseq [ media-items (partition-all 50 missing-media-items)]
-      (backup-batch gphoto-auth media-items))))
+      (with-retries
+        (backup-batch gphoto-auth media-items)))))
 
 (defn- cmd-gphoto-catalog
   "Catalog the contents of the gphoto album."
