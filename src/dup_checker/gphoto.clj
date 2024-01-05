@@ -201,7 +201,7 @@
 
 (defn- get-snapshot-media-items []
   (query-all (sfm/db)
-             [(str "SELECT entry_id, gphoto_id, name, creation_time"
+             [(str "SELECT entry_id, gphoto_id, name, creation_time, mime_type"
                    "  FROM gphoto_media_item"
                    " ORDER BY creation_time")]))
 
@@ -229,6 +229,9 @@
       (log/info "Creating target directory: " path)
       (.mkdirs f))))
 
+(defn- is-video? [ media-item ]
+  (.startsWith (:mime_type media-item) "video"))
+
 (defn- backup-media-item [ gphoto-auth media-item ]
   (let [target-file (:target-filename media-item)
         base-url (:base_url media-item)]
@@ -238,7 +241,9 @@
       (let [ f (java.io.File. target-file) ]
         (mkdir-if-needed (:target-path media-item))
         (with-retries
-          (with-open [ in (http/get-json base-url :auth gphoto-auth :as-binary-stream true) ]
+          (with-open [ in (http/get-json (str base-url (if (is-video? media-item) "=dv" "=d"))
+                                         :auth gphoto-auth
+                                         :as-binary-stream true) ]
             (clojure.java.io/copy in f)))))))
 
 (defn- add-media-item-local-file-info [ base-path media-item ]
