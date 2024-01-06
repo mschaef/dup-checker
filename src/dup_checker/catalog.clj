@@ -29,16 +29,17 @@
                       " WHERE catalog_type.catalog_type = ?")
                  catalog-type]))
 
+(defn- insert-catalog [ catalog-rec ]
+    (:catalog_id (first
+                  (jdbc/insert! (sfm/db) :catalog (log/spy :info catalog-rec)))))
+
 (defn- create-catalog [ catalog-name root-path catalog-type]
-  (:catalog_id (first
-                (jdbc/insert! (sfm/db)
-                              :catalog
-                              {:name catalog-name
-                               :catalog_type_id (find-catalog-type-id catalog-type)
-                               :created_on (java.util.Date.)
-                               :updated_on (java.util.Date.)
-                               :root_path root-path
-                               :hostname (current-hostname)}))))
+  (insert-catalog {:name catalog-name
+                   :catalog_type_id (find-catalog-type-id catalog-type)
+                   :created_on (java.util.Date.)
+                   :updated_on (java.util.Date.)
+                   :root_path root-path
+                   :hostname (current-hostname)}) )
 
 (defn ensure-catalog [ catalog-name root-path catalog-type ]
   (if-let [ existing-catalog-id (get-catalog-id catalog-name ) ]
@@ -147,8 +148,53 @@
     (jdbc/delete! (sfm/db) :file [ "catalog_id=?" catalog-id])
     (jdbc/delete! (sfm/db) :catalog [ "catalog_id=?" catalog-id])))
 
+
+(defn pretty-spit [filename collection]
+  (spit (java.io.File. filename)
+        (with-out-str
+          (pprint/write collection :dispatch pprint/code-dispatch))))
+
+(defn pretty-slurp [ filename ]
+  (clojure.edn/read-string (slurp filename)))
+
+(defn- cmd-export-catalog [ catalog-name filename ]
+  (let [catalog-id (or (get-catalog-id catalog-name)
+                       (fail "No known catalog: " catalog-name))]
+    (pretty-spit
+     filename
+     {:catalog (query-first (sfm/db)
+                            [(str "SELECT name, created_on, updated_on, root_path, hostname, catalog_type"
+                                  "  FROM catalog, catalog_type"
+                                  " WHERE catalog_id=?"
+                                  "   AND catalog.catalog_type_id = catalog_type.catalog_type_id")
+                             catalog-id])
+      :items (query-all (sfm/db)
+                        [(str "SELECT name, extension, size, last_modified_on, md5_digest"
+                              "  FROM file"
+                              " WHERE catalog_id=?")
+                         catalog-id])})))
+
+(defn- cmd-import-catalog [ catalog-name filename ]
+  (when (get-catalog-id catalog-name)
+    (fail "Catalog already exists: " catalog-name))
+  (let [{ catalog :catalog items :items } (pretty-slurp filename)
+        catalog (-> catalog
+                    (assoc :name catalog-name)
+                    (dissoc :catalog_type)
+                    (assoc :catalog_type_id (find-catalog-type-id (:catalog_type catalog))))
+        catalog-id (insert-catalog catalog)]
+    (log/info "Created catalog ID:" catalog-id)
+    (doseq [ item items ]
+      (log/info "Adding item: " (:name item))
+      (jdbc/insert! (sfm/db)
+                    :file
+                    (assoc item :catalog_id catalog-id)))))
+
 (def subcommands
   #^{:doc "Catalog subcommands"}
   {"ls" #'cmd-list-catalogs
    "list-files" #'cmd-list-catalog-files
-   "rm" #'cmd-remove-catalog})
+   "rm" #'cmd-remove-catalog
+
+   "export" #'cmd-export-catalog
+   "import" #'cmd-import-catalog})
