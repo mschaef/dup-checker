@@ -15,7 +15,7 @@
             [dup-checker.gphoto :as gphoto]
             [dup-checker.s3 :as s3]))
 
-(defn- filenames-by-digest [ ]
+(defn- all-filenames-by-digest [ ]
   (into {} (map (fn [ value ]
                   [(:md5_digest value) (:name value)])
                 (query-all (sfm/db)
@@ -26,7 +26,7 @@
   "List all duplicate files by MD5 digest."
   [ ]
 
-  (let [ md5-to-filename (filenames-by-digest)]
+  (let [ md5-to-filename (all-filenames-by-digest)]
     (table
      (map (fn [ file-rec ]
             {:md5-digest (:md5_digest file-rec)
@@ -50,6 +50,7 @@
                     " WHERE md5_digest=?"
                     " ORDER BY name")
                md5-digest])))
+
 
 (def subcommands
   {"s3" s3/subcommands

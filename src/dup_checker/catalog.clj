@@ -31,7 +31,7 @@
 
 (defn- insert-catalog [ catalog-rec ]
     (:catalog_id (first
-                  (jdbc/insert! (sfm/db) :catalog (log/spy :info catalog-rec)))))
+                  (jdbc/insert! (sfm/db) :catalog catalog-rec))))
 
 (defn- create-catalog [ catalog-name root-path catalog-type]
   (insert-catalog {:name catalog-name
@@ -56,12 +56,16 @@
                     catalog-id])
      0))
 
-(defn get-catalog-files [ catalog-id ]
-  (set (map :name (query-all (sfm/db)
-                             [(str "SELECT name"
-                                   "  FROM file"
-                                   " WHERE file.catalog_id = ?")
-                              catalog-id]))))
+(defn- get-all-catalog-files [ catalog-id ]
+  (query-all (sfm/db)
+             [(str "SELECT *"
+                   "  FROM file"
+                   " WHERE file.catalog_id = ?"
+                   " ORDER BY md5_digest")
+              catalog-id]))
+
+(defn- get-catalog-file-names [ catalog-id ]
+  (set (map :name (get-all-catalog-files catalog-id))))
 
 (def image-extensions
   #{"vob" "m4p" "wmv" "xbm" "lrcat" "pcx"
@@ -97,7 +101,7 @@
                      :md5_digest (file-md5-digest file-info)}))))
 
 (defn catalog-files [ catalog-id file-infos ]
-  (let [catalog-files (get-catalog-files catalog-id)]
+  (let [catalog-files (get-catalog-file-names catalog-id)]
     (doseq [ f file-infos ]
       (catalog-file catalog-files catalog-id f))))
 
@@ -121,6 +125,10 @@
                          " GROUP BY catalog.catalog_id, catalog.name, catalog.updated_on, catalog_type, catalog.root_path"
                          " ORDER BY catalog_id")]))))
 
+(defn- get-required-catalog-id [ catalog-name ]
+  (or (get-catalog-id catalog-name)
+      (fail "No known catalog: " catalog-name)))
+
 (defn- cmd-list-catalog-files
   "List all files present in a catalog."
   [ catalog-name ]
@@ -130,14 +138,7 @@
           {:md5-digest (:md5_digest file-rec)
            :name (:name file-rec)
            :size (:size file-rec)})
-        (let [catalog-id (or (get-catalog-id catalog-name)
-                             (fail "No known catalog: " catalog-name))]
-          (query-all (sfm/db)
-                     [(str "SELECT md5_digest, name, size"
-                           "  FROM file"
-                           " WHERE catalog_id=?"
-                           " ORDER BY md5_digest")
-                      catalog-id])))))
+        (get-all-catalog-files (get-required-catalog-id catalog-name)))))
 
 (defn- cmd-remove-catalog
   "Remove a catalog."
@@ -148,18 +149,8 @@
     (jdbc/delete! (sfm/db) :file [ "catalog_id=?" catalog-id])
     (jdbc/delete! (sfm/db) :catalog [ "catalog_id=?" catalog-id])))
 
-
-(defn pretty-spit [filename collection]
-  (spit (java.io.File. filename)
-        (with-out-str
-          (pprint/write collection :dispatch pprint/code-dispatch))))
-
-(defn pretty-slurp [ filename ]
-  (clojure.edn/read-string (slurp filename)))
-
 (defn- cmd-export-catalog [ catalog-name filename ]
-  (let [catalog-id (or (get-catalog-id catalog-name)
-                       (fail "No known catalog: " catalog-name))]
+  (let [catalog-id (get-required-catalog-id catalog-name)]
     (pretty-spit
      filename
      {:catalog (query-first (sfm/db)
@@ -168,11 +159,7 @@
                                   " WHERE catalog_id=?"
                                   "   AND catalog.catalog_type_id = catalog_type.catalog_type_id")
                              catalog-id])
-      :items (query-all (sfm/db)
-                        [(str "SELECT name, extension, size, last_modified_on, md5_digest"
-                              "  FROM file"
-                              " WHERE catalog_id=?")
-                         catalog-id])})))
+      :items (get-all-catalog-files catalog-id)})))
 
 (defn- cmd-import-catalog [ catalog-name filename ]
   (when (get-catalog-id catalog-name)
@@ -190,11 +177,28 @@
                     :file
                     (assoc item :catalog_id catalog-id)))))
 
+(defn- catalog-files-by-digest [ catalog-name ]
+  (into {} (map (fn [ value ]
+                  [(:md5_digest value) value])
+                (get-all-catalog-files (get-required-catalog-id catalog-name)))))
+
+(defn- cmd-catalog-list-missing
+  "Identify files missing in a given catalog."
+
+  [ catalog-name required-catalog-name ]
+
+  (let [catalog-files (catalog-files-by-digest catalog-name) ]
+    (doseq [ file (get-all-catalog-files
+                   (get-required-catalog-id required-catalog-name)) ]
+      (when (not (get catalog-files (:md5_digest file)))
+        (log/info "Missing file:" file)))))
+
 (def subcommands
   #^{:doc "Catalog subcommands"}
   {"ls" #'cmd-list-catalogs
    "list-files" #'cmd-list-catalog-files
    "rm" #'cmd-remove-catalog
+   "list-missing" #'cmd-catalog-list-missing
 
    "export" #'cmd-export-catalog
    "import" #'cmd-import-catalog})
