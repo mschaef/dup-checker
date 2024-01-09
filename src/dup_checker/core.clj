@@ -23,14 +23,23 @@
    "fs" fs/subcommands
    "describe" describe/subcommands})
 
+(defn- spaces [ n ]
+  (clojure.string/join (repeat n " ")))
+
 (defn- display-help [ cmd-map ]
-  (println "Valid Commands:")
-  (table
-   (map (fn [ cmd-name ]
-          {:command cmd-name
-           :help (:doc (meta (get cmd-map cmd-name)))
-           :args (:arglists (meta (get cmd-map cmd-name)))})
-        (sort (keys cmd-map)))))
+  (println "\n\nCommand Paths:\n")
+
+  (letfn [(display-subcommands [ cmd-map indent ]
+            (doseq [ cmd-name (sort (keys cmd-map)) ]
+              (let [cmd-fn (get cmd-map cmd-name)
+                    { doc :doc arglists :arglists } (meta cmd-fn) ]
+                (if (map? cmd-fn)
+                  (do
+                    (println (spaces (* indent 2)) cmd-name (if doc (str " - " doc) ""))
+                    (display-subcommands cmd-fn (+ indent 1))
+                    (println))
+                  (println (spaces (* indent 2)) cmd-name arglists (if doc (str " - " doc) ""))))))]
+    (display-subcommands cmd-map 0)))
 
 (defn- dispatch-subcommand [ cmd-map args ]
   (try
