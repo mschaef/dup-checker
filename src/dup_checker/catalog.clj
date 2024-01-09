@@ -139,7 +139,10 @@
     (jdbc/delete! (sfm/db) :file [ "catalog_id=?" catalog-id])
     (jdbc/delete! (sfm/db) :catalog [ "catalog_id=?" catalog-id])))
 
-(defn- cmd-export-catalog [ catalog-name filename ]
+(defn- cmd-export-catalog
+  "Export a catalog to an EDN file."
+
+  [ catalog-name filename ]
   (let [catalog-id (get-required-catalog-id catalog-name)]
     (pretty-spit
      filename
@@ -151,7 +154,10 @@
                              catalog-id])
       :items (get-all-catalog-files catalog-id)})))
 
-(defn- cmd-import-catalog [ catalog-name filename ]
+(defn- cmd-import-catalog
+  "Import a catalog previously exported to an EDN file."
+  [ catalog-name filename ]
+
   (when (get-catalog-id catalog-name)
     (fail "Catalog already exists: " catalog-name))
   (let [{ catalog :catalog items :items } (pretty-slurp filename)

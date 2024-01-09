@@ -38,7 +38,7 @@
                     (println (spaces (* indent 2)) cmd-name (if doc (str " - " doc) ""))
                     (display-subcommands cmd-fn (+ indent 1))
                     (println))
-                  (println (spaces (* indent 2)) cmd-name arglists (if doc (str " - " doc) ""))))))]
+                  (println (spaces (* indent 2)) cmd-name (first arglists) (if doc (str " - " doc) ""))))))]
     (display-subcommands cmd-map 0)))
 
 (defn- dispatch-subcommand [ cmd-map args ]

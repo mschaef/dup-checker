@@ -69,13 +69,19 @@
                        "  WHEN NOT MATCHED THEN INSERT (refresh_token) VALUES (new_jwt.refresh_token) ")
                   (:refresh_token jwt)]))
 
-(defn- cmd-gphoto-logout []
+(defn- cmd-gphoto-logout
+  "Log out from any currently authenticated Google Photo account."
+
+  []
   (jdbc/delete! (sfm/db) :google_jwt []))
 
 (defn- gphoto-oauth-config []
   (:installed (try-parse-json (slurp "google-oauth.json"))))
 
-(defn- cmd-gphoto-login []
+(defn- cmd-gphoto-login
+  "Login to a Google Photo account."
+
+  []
   (let [oauth (gphoto-oauth-config)]
     (or (load-google-refresh-token)
         (if-let [ authorization-code (gphoto-authenticate oauth) ]
@@ -118,7 +124,10 @@
     (provider-fn)
     provider-fn))
 
-(defn- cmd-gphoto-api-token []
+(defn- cmd-gphoto-api-token
+  "Return an API token for the currently authenticated Google Photo account."
+
+  []
   (pprint/pprint (gphoto-ensure-access-token (gphoto-ensure-creds))))
 
 
@@ -300,13 +309,13 @@
      (map (partial gphoto-info gphoto-auth) (get-gphoto-media-items gphoto-auth)))))
 
 (def gphoto-snapshot-subcommands
-  #^{:doc "Snapshot subcommands"}
+  #^{:doc "Commands for interacting with a snapshot taken from a Google Photo Album"}
   {"update" #'cmd-gphoto-snapshot-update
    "ls" #'cmd-gphoto-snapshot-list
    "backup" #'cmd-gphoto-snapshot-backup})
 
 (def subcommands
-  #^{:doc "Google Photo subcommands"}
+  #^{:doc "Commands for interacting with a Google Photo album."}
   {"login" #'cmd-gphoto-login
    "logout" #'cmd-gphoto-logout
    "api-token" #'cmd-gphoto-api-token
