@@ -105,7 +105,7 @@
     (doseq [ f file-infos ]
       (catalog-file catalog-files catalog-id f))))
 
-(defn- cmd-list-catalogs
+(defn- cmd-catalog-list
   "List all catalogs"
   [ ]
   (table
@@ -122,7 +122,7 @@
   (or (get-catalog-id catalog-name)
       (fail "No known catalog: " catalog-name)))
 
-(defn- cmd-list-catalog-files
+(defn- cmd-catalog-list-files
   "List all files present in a catalog."
   [ catalog-name ]
 
@@ -130,7 +130,7 @@
    [:md5_digest :size :name]
    (get-all-catalog-files (get-required-catalog-id catalog-name))))
 
-(defn- cmd-remove-catalog
+(defn- cmd-catalog-remove
   "Remove a catalog."
   [ catalog-name ]
 
@@ -138,7 +138,7 @@
     (jdbc/delete! (sfm/db) :file [ "catalog_id=?" catalog-id])
     (jdbc/delete! (sfm/db) :catalog [ "catalog_id=?" catalog-id])))
 
-(defn- cmd-export-catalog
+(defn- cmd-catalog-export
   "Export a catalog to an EDN file."
 
   [ catalog-name filename ]
@@ -153,7 +153,7 @@
                              catalog-id])
       :items (get-all-catalog-files catalog-id)})))
 
-(defn- cmd-import-catalog
+(defn- cmd-catalog-import
   "Import a catalog previously exported to an EDN file."
   [ catalog-name filename ]
 
@@ -191,10 +191,10 @@
 
 (def subcommands
   #^{:doc "Catalog subcommands"}
-  {"ls" #'cmd-list-catalogs
-   "list-files" #'cmd-list-catalog-files
-   "rm" #'cmd-remove-catalog
+  {"ls" #'cmd-catalog-list
+   "list-files" #'cmd-catalog-list-files
+   "rm" #'cmd-catalog-remove
    "list-missing" #'cmd-catalog-list-missing
 
-   "export" #'cmd-export-catalog
-   "import" #'cmd-import-catalog})
+   "export" #'cmd-catalog-export
+   "import" #'cmd-catalog-import})

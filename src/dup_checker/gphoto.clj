@@ -161,15 +161,15 @@
                                    :auth gphoto-auth
                                    :as-binary-stream true)})
 
-(defn- cmd-list-gphoto-albums
+(defn- cmd-gphoto-list-albums
   "List available Google Photo Albums"
 
   []
   (let [ gphoto-auth (gphoto-auth-provider) ]
-    (doseq [ album (get-gphoto-albums gphoto-auth) ]
-      (pprint/pprint album))))
+    (table [[:title 50] :mediaItemsCount [:id 80]]
+           (get-gphoto-albums gphoto-auth))))
 
-(defn- cmd-list-gphoto-media-items
+(defn- cmd-gphoto-list-media-items
   "List available Google Photo media items."
 
   []
@@ -319,7 +319,7 @@
   {"login" #'cmd-gphoto-login
    "logout" #'cmd-gphoto-logout
    "api-token" #'cmd-gphoto-api-token
-   "lsa" #'cmd-list-gphoto-albums
-   "lsmi" #'cmd-list-gphoto-media-items
+   "lsa" #'cmd-gphoto-list-albums
+   "lsmi" #'cmd-gphoto-list-media-items
    "snapshot" gphoto-snapshot-subcommands
    "catalog" #'cmd-gphoto-catalog})
