@@ -40,8 +40,8 @@
                            " WHERE count > 1"
                            " ORDER BY count")])))))
 
-(defn- cmd-describe-file
-  "Describe a file identified by MD5 digest."
+(defn- cmd-describe-digest
+  "List every instance of a file with a given MD5 digest."
   [ md5-digest ]
   (table
    [:catalog_name :file_name :last_modified_on :size]
@@ -53,12 +53,27 @@
                     " ORDER BY catalog_name")
                md5-digest])))
 
+(defn- cmd-describe-filename
+  "List every instance of a file with the given text in its filename."
+
+  [ filename-segment ]
+  (table
+   [:catalog_name :file_name :last_modified_on :size :md5_digest]
+   (query-all (sfm/db)
+              [(str "SELECT file.name as file_name, catalog.name as catalog_name, file.size, file.last_modified_on, md5_digest"
+                    "  FROM file, catalog"
+                    " WHERE INSTR(file.name, ?) > 0"
+                    "  AND file.catalog_id=catalog.catalog_id"
+                    " ORDER BY catalog_name")
+               filename-segment])))
+
 (def subcommands
   {"s3" s3/subcommands
    "catalog" catalog/subcommands
    "gphoto" gphoto/subcommands
    "fs" fs/subcommands
-   "describe" #'cmd-describe-file
+   "describe-digest" #'cmd-describe-digest
+   "describe-filename" #'cmd-describe-filename
    "list-dups" #'cmd-list-dups})
 
 (defn- display-help [ cmd-map ]
