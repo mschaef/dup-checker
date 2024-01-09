@@ -8,10 +8,45 @@
     (println (str "Error: " full-message))
     (throw (RuntimeException. full-message))))
 
+(def default-columns
+  {:md5_digest 22
+   :count 7
+   :catalog_name 24
+   :name 40
+   :size 11
+   :gphoto_id 100
+   :creation_time 23
+   :updated_on 23
+   :last_modified_on 23
+   :n 8})
+
+(defn- normalize-colspec [ colspec ]
+  (if (vector? colspec)
+    colspec
+    [colspec
+     (get default-columns colspec (count (str colspec)) )]))
+
+(defn spaces [ n ]
+  (clojure.string/join (repeat n " ")))
+
+(defn- colstr [ colspec row ]
+  (let [[ key width ] colspec
+        val (str (get row key ""))
+        padreq (- width (count val))]
+    (if (<= padreq 0)
+      val
+      (str val (spaces padreq)))))
+
+(defn- print-row [ ks row ]
+  (println (clojure.string/join " " (map #(colstr % row) ks))))
+
 (defn table [ ks rows ]
-  (doseq [ p (partition-all 500 rows)]
-    (pprint/print-table ks p))
-  (println "n=" (count rows)))
+  (let [ks (map normalize-colspec ks)]
+    (print-row ks (into {} (map (fn [ [ key _ ] ]
+                                  [ key key ]) ks)))
+    (doseq [ row rows ]
+      (print-row ks row))
+    (println "n=" (count rows))))
 
 (defn get-filename-extension [ name ]
   (let [sep-index (.lastIndexOf name ".")]

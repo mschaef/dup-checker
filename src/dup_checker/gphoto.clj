@@ -220,7 +220,7 @@
   [ ]
 
   (table
-   [:entry_id :gphoto_id :name :creation_time]
+   [:entry_id :gphoto_id :creation_time :name]
    (get-snapshot-media-items)))
 
 (def path-sep java.io.File/separator)

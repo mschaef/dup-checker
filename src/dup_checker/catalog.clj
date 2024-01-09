@@ -109,7 +109,7 @@
   "List all catalogs"
   [ ]
   (table
-   [:n :catalog_id :name :root_path :catalog_type :size :updated_on]
+   [:name :catalog_id :updated_on :catalog_type [:root_path 50] :n :size ]
    (query-all (sfm/db)
               [(str "SELECT catalog.catalog_id, catalog.name, catalog.root_path, catalog.updated_on, count(file_id) as n, sum(file.size) as size, catalog_type.catalog_type"
                     "  FROM catalog, file, catalog_type"
@@ -127,7 +127,7 @@
   [ catalog-name ]
 
   (table
-   [:md5_digest :name :size]
+   [:md5_digest :size :name]
    (get-all-catalog-files (get-required-catalog-id catalog-name))))
 
 (defn- cmd-remove-catalog
@@ -184,7 +184,7 @@
 
   (let [catalog-files (catalog-files-by-digest catalog-name) ]
     (table
-     [:name :size :last_modified_on :md5_digest]
+     [:last_modified_on :md5_digest :size :name ]
      (remove #(get catalog-files (:md5_digest %))
              (get-all-catalog-files
               (get-required-catalog-id required-catalog-name))))))

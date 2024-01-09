@@ -23,9 +23,6 @@
    "fs" fs/subcommands
    "describe" describe/subcommands})
 
-(defn- spaces [ n ]
-  (clojure.string/join (repeat n " ")))
-
 (defn- display-help [ cmd-map ]
   (println "\n\nCommand Paths:\n")
 
