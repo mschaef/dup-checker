@@ -18,10 +18,8 @@
 
   (let [ md5-to-filename (all-filenames-by-digest)]
     (table
-     (map (fn [ file-rec ]
-            {:md5-digest (:md5_digest file-rec)
-             :count (:count file-rec)
-             :name (md5-to-filename (:md5_digest file-rec))})
+     [:md5_digest :count :name]
+     (map #(assoc % :name (md5-to-filename (:md5_digest %)))
           (query-all (sfm/db)
                      [(str "SELECT * FROM ("
                            "   SELECT md5_digest, count(md5_digest) as count"

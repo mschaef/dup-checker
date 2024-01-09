@@ -8,14 +8,10 @@
     (println (str "Error: " full-message))
     (throw (RuntimeException. full-message))))
 
-(defn table
-  ([ rows ]
-   (table (keys (first rows)) rows))
-
-  ([ ks rows ]
-   (doseq [ p (partition-all 500 rows)]
-     (pprint/print-table ks p))
-   (println "n=" (count rows))))
+(defn table [ ks rows ]
+  (doseq [ p (partition-all 500 rows)]
+    (pprint/print-table ks p))
+  (println "n=" (count rows)))
 
 (defn get-filename-extension [ name ]
   (let [sep-index (.lastIndexOf name ".")]
