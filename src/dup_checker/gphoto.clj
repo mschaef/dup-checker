@@ -211,12 +211,8 @@
   [ ]
 
   (table
-   (map (fn [ media-item ]
-          {:entry-id (:entry_id media-item)
-           :gphoto-id (:gphoto_id media-item)
-           :name (:name media-item)
-           :creation-time (:creation_time media-item)})
-        (get-snapshot-media-items))))
+   [:entry_id :gphoto_id :name :creation_time]
+   (get-snapshot-media-items)))
 
 (def path-sep java.io.File/separator)
 

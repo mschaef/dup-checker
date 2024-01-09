@@ -109,21 +109,14 @@
   "List all catalogs"
   [ ]
   (table
-   (map (fn [ catalog-rec ]
-          {:n (:n catalog-rec)
-           :id (:catalog_id catalog-rec)
-           :name (:name catalog-rec)
-           :root-path (:root_path catalog-rec)
-           :catalog-type (:catalog_type catalog-rec)
-           :size (:size catalog-rec)
-           :updated-on (:updated_on catalog-rec)})
-        (query-all (sfm/db)
-                   [(str "SELECT catalog.catalog_id, catalog.name, catalog.root_path, catalog.updated_on, count(file_id) as n, sum(file.size) as size, catalog_type.catalog_type"
-                         "  FROM catalog, file, catalog_type"
-                         " WHERE catalog.catalog_id = file.catalog_id"
-                         "   AND catalog.catalog_type_id = catalog_type.catalog_type_id"
-                         " GROUP BY catalog.catalog_id, catalog.name, catalog.updated_on, catalog_type, catalog.root_path"
-                         " ORDER BY catalog_id")]))))
+   [:n :catalog_id :name :root_path :catalog_type :size :updated_on]
+   (query-all (sfm/db)
+              [(str "SELECT catalog.catalog_id, catalog.name, catalog.root_path, catalog.updated_on, count(file_id) as n, sum(file.size) as size, catalog_type.catalog_type"
+                    "  FROM catalog, file, catalog_type"
+                    " WHERE catalog.catalog_id = file.catalog_id"
+                    "   AND catalog.catalog_type_id = catalog_type.catalog_type_id"
+                    " GROUP BY catalog.catalog_id, catalog.name, catalog.updated_on, catalog_type, catalog.root_path"
+                    " ORDER BY catalog_id")])))
 
 (defn- get-required-catalog-id [ catalog-name ]
   (or (get-catalog-id catalog-name)
@@ -134,11 +127,8 @@
   [ catalog-name ]
 
   (table
-   (map (fn [ file-rec ]
-          {:md5-digest (:md5_digest file-rec)
-           :name (:name file-rec)
-           :size (:size file-rec)})
-        (get-all-catalog-files (get-required-catalog-id catalog-name)))))
+   [:md5_digest :name :size]
+   (get-all-catalog-files (get-required-catalog-id catalog-name))))
 
 (defn- cmd-remove-catalog
   "Remove a catalog."

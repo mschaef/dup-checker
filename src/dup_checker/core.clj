@@ -44,13 +44,14 @@
   "Describe a file identified by MD5 digest."
   [ md5-digest ]
   (table
+   [:catalog_name :file_name :last_modified_on :size]
    (query-all (sfm/db)
-              [(str "SELECT *"
-                    "  FROM file"
+              [(str "SELECT file.name as file_name, catalog.name as catalog_name, file.size, file.last_modified_on"
+                    "  FROM file, catalog"
                     " WHERE md5_digest=?"
-                    " ORDER BY name")
+                    "  AND file.catalog_id=catalog.catalog_id"
+                    " ORDER BY catalog_name")
                md5-digest])))
-
 
 (def subcommands
   {"s3" s3/subcommands
