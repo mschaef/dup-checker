@@ -134,8 +134,7 @@
   "Remove a catalog."
   [ catalog-name ]
 
-  (let [catalog-id (or (get-catalog-id catalog-name)
-                       (fail "No known catalog: " catalog-name))]
+  (let [catalog-id (get-required-catalog-id catalog-name)]
     (jdbc/delete! (sfm/db) :file [ "catalog_id=?" catalog-id])
     (jdbc/delete! (sfm/db) :catalog [ "catalog_id=?" catalog-id])))
 
