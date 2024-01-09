@@ -188,10 +188,11 @@
   [ catalog-name required-catalog-name ]
 
   (let [catalog-files (catalog-files-by-digest catalog-name) ]
-    (doseq [ file (get-all-catalog-files
-                   (get-required-catalog-id required-catalog-name)) ]
-      (when (not (get catalog-files (:md5_digest file)))
-        (log/info "Missing file:" file)))))
+    (table
+     [:name :size :last_modified_on :md5_digest]
+     (remove #(get catalog-files (:md5_digest %))
+             (get-all-catalog-files
+              (get-required-catalog-id required-catalog-name))))))
 
 (def subcommands
   #^{:doc "Catalog subcommands"}
