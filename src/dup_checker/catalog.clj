@@ -22,12 +22,12 @@
   existing-catalog-id)
 
 (defn- find-catalog-type-id [ catalog-type ]
-  ;; TODO: query-scaler-required
-  (query-scalar (sfm/db)
-                [(str "SELECT catalog_type_id"
-                      "  FROM catalog_type"
-                      " WHERE catalog_type.catalog_type = ?")
-                 catalog-type]))
+  (query-scalar-required
+   (sfm/db)
+   [(str "SELECT catalog_type_id"
+         "  FROM catalog_type"
+         " WHERE catalog_type.catalog_type = ?")
+    catalog-type]))
 
 (defn- insert-catalog [ catalog-rec ]
     (:catalog_id (first

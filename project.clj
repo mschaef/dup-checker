@@ -6,9 +6,9 @@
   :dependencies [[org.clojure/clojure "1.11.1"]
                  [listora/again "1.0.0"]
                  [org.clj-commons/digest "1.4.100"]
-                 [software.amazon.awssdk/s3  "2.20.52"]
-                 [com.mschaef/sql-file "0.4.9"]
-                 [ring/ring-jetty-adapter "1.9.6"]
+                 [software.amazon.awssdk/s3  "2.23.0"]
+                 [com.mschaef/sql-file "0.4.10"]
+                 [ring/ring-jetty-adapter "1.11.0"]
                  [clj-http "3.12.3"
                   :exclusions [com.fasterxml.jackson.core/jackson-core]]
                  [org.clojure/core.async "1.6.681"]

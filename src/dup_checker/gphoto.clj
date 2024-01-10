@@ -178,8 +178,7 @@
       (pprint/pprint item))))
 
 (defn get-snapshot-item-ids [ ]
-  (set (map :gphoto_id (query-all (sfm/db)
-                                  "SELECT gphoto_id FROM gphoto_media_item"))))
+  (set (query-column (sfm/db) "SELECT gphoto_id FROM gphoto_media_item")))
 
 (defn- snapshot-item [ existing-item-ids media-item ]
   (cond
