@@ -53,18 +53,13 @@
       (display-help cmd-map))))
 
 (defn- app-main
-  ([ entry args config-overrides ]
-   (let [config (-> (config/load-config)
-                    (merge config-overrides))]
+  ([ entry ]
+   (let [config (config/load-config)]
      (logging/setup-logging config)
      (log/info "Starting App" (:app config))
      (with-exception-barrier :app-entry
-       (entry config args))
-     (log/info "end run.")))
-
-  ([ entry args ]
-   (app-main entry {:log-levels
-                    [[#{"hsqldb.*" "com.zaxxer.hikari.*"} :warn]]})))
+       (entry config))
+     (log/info "end run."))))
 
 (defn- db-conn-spec [ config ]
   ;; TODO: Much of this logic should somehow go in playbook
@@ -75,11 +70,7 @@
 
 (defn -main [& args] ;; TODO: Does playbook need a standard main? Or wrapper?
   (app-main
-   (fn [ config args ]
+   (fn [ config ]
      (sql-file/with-pool [db-conn (db-conn-spec config)]
        (sfm/with-db-connection db-conn
-         (dispatch-subcommand subcommands args))))
-   args
-   {:log-levels
-    [[#{"hsqldb.*" "com.zaxxer.hikari.*"} :warn]
-     [#{"dup-checker.*"} :info]]}))
+         (dispatch-subcommand subcommands args))))))

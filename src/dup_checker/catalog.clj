@@ -1,6 +1,7 @@
 (ns dup-checker.catalog
-  (:use dup-checker.util
-        sql-file.sql-util)
+  (:use playbook.core
+        sql-file.sql-util
+        dup-checker.util)
   (:require [clojure.pprint :as pprint]
             [taoensso.timbre :as log]
             [clj-commons.digest :as digest]
@@ -143,7 +144,7 @@
 
   [ catalog-name filename ]
   (let [catalog-id (get-required-catalog-id catalog-name)]
-    (pretty-spit
+    (edn-spit
      filename
      {:catalog (query-first (sfm/db)
                             [(str "SELECT name, created_on, updated_on, root_path, hostname, catalog_type"
@@ -159,7 +160,7 @@
 
   (when (get-catalog-id catalog-name)
     (fail "Catalog already exists: " catalog-name))
-  (let [{ catalog :catalog items :items } (pretty-slurp filename)
+  (let [{ catalog :catalog items :items } (edn-slurp filename)
         catalog (-> catalog
                     (assoc :name catalog-name)
                     (dissoc :catalog_type)
