@@ -1,15 +1,12 @@
 (ns dup-checker.core
   (:gen-class :main true)
   (:use playbook.core
-        sql-file.sql-util
+        playbook.main
         dup-checker.util)
-  (:require [clojure.pprint :as pprint]
+  (:require [playbook.config :as config]
             [sql-file.core :as sql-file]
             [sql-file.middleware :as sfm]
-            [playbook.logging :as logging]
-            [playbook.config :as config]
             [taoensso.timbre :as log]
-            [clojure.java.jdbc :as jdbc]
             [dup-checker.catalog :as catalog]
             [dup-checker.describe :as describe]
             [dup-checker.fs :as fs]
@@ -52,25 +49,15 @@
     (catch Exception e
       (display-help cmd-map))))
 
-(defn- app-main
-  ([ entry ]
-   (let [config (config/load-config)]
-     (logging/setup-logging config)
-     (log/info "Starting App" (:app config))
-     (with-exception-barrier :app-entry
-       (entry config))
-     (log/info "end run."))))
-
-(defn- db-conn-spec [ config ]
+(defn- db-conn-spec [ ]
   ;; TODO: Much of this logic should somehow go in playbook
-  {:name (or (config-property "db.subname")
-             (get-in config [:db :subname] "dup-checker"))
+  {:name (or (config/property "db.subname")
+             (or (config/cval :db :subname)
+                 (config/cval :app :name)))
    :schema-path [ "sql/" ]
-   :schemas [[ "dup-checker" 5 ]]})
+   :schemas (config/cval :db :schemas)})
 
-(defn -main [& args] ;; TODO: Does playbook need a standard main? Or wrapper?
-  (app-main
-   (fn [ config ]
-     (sql-file/with-pool [db-conn (db-conn-spec config)]
-       (sfm/with-db-connection db-conn
-         (dispatch-subcommand subcommands args))))))
+(defmain [& args]
+  (sql-file/with-pool [db-conn (db-conn-spec)]
+    (sfm/with-db-connection db-conn
+      (dispatch-subcommand subcommands args))))

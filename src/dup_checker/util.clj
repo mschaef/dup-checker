@@ -68,11 +68,4 @@
      ~@forms))
 
 
-(defn pretty-spit [filename collection]
-  (spit (java.io.File. filename)
-        (with-out-str
-          (pprint/write collection :dispatch pprint/code-dispatch))))
-
-(defn pretty-slurp [ filename ]
-  (clojure.edn/read-string (slurp filename)))
 
