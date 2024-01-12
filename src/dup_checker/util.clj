@@ -9,7 +9,7 @@
     (throw (RuntimeException. full-message))))
 
 (def default-columns
-  {:md5_digest 22
+  {:md5_digest 32
    :count 7
    :catalog_name 24
    :name 40

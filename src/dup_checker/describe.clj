@@ -28,9 +28,10 @@
                            " WHERE count > 1"
                            " ORDER BY count")])))))
 
-(defn- cmd-describe-digest
+(defn- describe-digest
   "List every instance of a file with a given MD5 digest."
   [ md5-digest ]
+  (println "Digest: " md5-digest)
   (table
    [:catalog_name :last_modified_on :size :file_name]
    (query-all (sfm/db)
@@ -39,12 +40,21 @@
                     " WHERE md5_digest=?"
                     "  AND file.catalog_id=catalog.catalog_id"
                     " ORDER BY catalog_name")
-               md5-digest])))
+               md5-digest]))
+  (println))
 
-(defn- cmd-describe-filename
+
+(defn- cmd-describe-digest
+  "List every instance of a file with the given MD5 digests."
+  [ & md5-digests ]
+  (doseq [ md5-digest md5-digests ]
+    (describe-digest md5-digest)))
+
+(defn- describe-filename
   "List every instance of a file with the given text in its filename."
 
   [ filename-segment ]
+  (println "Filename Segment: " filename-segment)
   (table
    [:catalog_name :md5_digest :last_modified_on :size :file_name]
    (query-all (sfm/db)
@@ -53,7 +63,15 @@
                     " WHERE INSTR(file.name, ?) > 0"
                     "  AND file.catalog_id=catalog.catalog_id"
                     " ORDER BY catalog_name")
-               filename-segment])))
+               filename-segment]))
+  (println))
+
+(defn- cmd-describe-filename
+  "List every instance of a file with any of the given text strings in its filename."
+
+  [ & filename-segments ]
+  (doseq [ filename-segment filename-segments ]
+    (describe-filename filename-segment)))
 
 (def subcommands
   {"digest" #'cmd-describe-digest
