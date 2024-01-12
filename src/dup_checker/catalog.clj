@@ -139,6 +139,16 @@
     (jdbc/delete! (sfm/db) :file [ "catalog_id=?" catalog-id])
     (jdbc/delete! (sfm/db) :catalog [ "catalog_id=?" catalog-id])))
 
+(defn- cmd-catalog-set-root
+  "Set the catalog root. (Useful if the cataloged files have been moved.)"
+  [ catalog-name catalog-root ]
+
+  (let [catalog-id (get-required-catalog-id catalog-name)]
+      (jdbc/update! (sfm/db)
+                    :catalog
+                    {:root_path catalog-root}
+                    ["catalog_id=?" catalog-id])))
+
 (defn- cmd-catalog-export
   "Export a catalog to an EDN file."
 
@@ -195,6 +205,8 @@
   {"ls" #'cmd-catalog-list
    "list-files" #'cmd-catalog-list-files
    "rm" #'cmd-catalog-remove
+   "set-root" #'cmd-catalog-set-root
+
    "list-missing" #'cmd-catalog-list-missing
 
    "export" #'cmd-catalog-export
