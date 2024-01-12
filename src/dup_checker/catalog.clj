@@ -8,6 +8,18 @@
             [clojure.java.jdbc :as jdbc]
             [sql-file.middleware :as sfm]))
 
+(defn all-filenames-by-digest [ ]
+  (into {} (map (fn [ value ]
+                  [(:md5_digest value) (:name value)])
+                (query-all (sfm/db) "SELECT md5_digest, name FROM file"))))
+
+(defn catalog-filenames-by-digest [ catalog-id ]
+  (into {} (map (fn [ value ]
+                  [(:md5_digest value) (:name value)])
+                (query-all (sfm/db)
+                           ["SELECT md5_digest, name FROM file WHERE catalog_id=?"
+                            catalog-id]))))
+
 (defn- get-catalog-id [catalog-name ]
   (query-scalar (sfm/db)
                 [(str "SELECT catalog_id"
@@ -123,6 +135,26 @@
   (or (get-catalog-id catalog-name)
       (fail "No known catalog: " catalog-name)))
 
+
+(defn- cmd-catalog-duplicates
+  "List all duplicate files in a catalog by MD5 digest."
+  [ catalog-name ]
+
+  (let [catalog-id (get-required-catalog-id catalog-name)
+        md5-to-filename (catalog-filenames-by-digest catalog-id)]
+    (table
+     [:md5_digest :count :name]
+     (map #(assoc % :name (md5-to-filename (:md5_digest %)))
+          (query-all (sfm/db)
+                     [(str "SELECT * FROM ("
+                           "   SELECT md5_digest, count(md5_digest) as count"
+                           "     FROM file"
+                           "   WHERE catalog_id=?"
+                           "    GROUP BY md5_digest)"
+                           " WHERE count > 1"
+                           " ORDER BY count")
+                      catalog-id])))))
+
 (defn- cmd-catalog-list-files
   "List all files present in a catalog."
   [ catalog-name ]
@@ -208,6 +240,7 @@
    "set-root" #'cmd-catalog-set-root
 
    "list-missing" #'cmd-catalog-list-missing
+   "duplicates" #'cmd-catalog-duplicates
 
    "export" #'cmd-catalog-export
    "import" #'cmd-catalog-import})

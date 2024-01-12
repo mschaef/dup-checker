@@ -3,20 +3,14 @@
         sql-file.sql-util
         dup-checker.util)
   (:require [sql-file.middleware :as sfm]
-            [taoensso.timbre :as log]))
-
-(defn- all-filenames-by-digest [ ]
-  (into {} (map (fn [ value ]
-                  [(:md5_digest value) (:name value)])
-                (query-all (sfm/db)
-                           [(str "SELECT md5_digest, name"
-                                 "  FROM file")]))))
+            [taoensso.timbre :as log]
+            [dup-checker.catalog :as catalog]))
 
 (defn- cmd-describe-duplicates
   "List all duplicate files by MD5 digest."
   [ ]
 
-  (let [ md5-to-filename (all-filenames-by-digest)]
+  (let [ md5-to-filename (catalog/all-filenames-by-digest)]
     (table
      [:md5_digest :count :name]
      (map #(assoc % :name (md5-to-filename (:md5_digest %)))
