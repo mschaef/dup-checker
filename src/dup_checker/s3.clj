@@ -36,7 +36,7 @@
                        (.build))
                 (software.amazon.awssdk.core.sync.ResponseTransformer/toInputStream))})
 
-(defn- cmd-catalog-s3-files
+(defn- cmd-s3-catalog
   "Catalog the contents of an s3 bucket."
   [ bucket-name catalog-name ]
 
@@ -45,7 +45,7 @@
      (catalog/ensure-catalog catalog-name bucket-name "s3")
      (map (partial s3-blob-info s3 bucket-name) (s3-list-bucket-paged s3 bucket-name)))))
 
-(defn- cmd-list-s3-bucket
+(defn- cmd-s3-list-bucket
   "List the contents of an s3 bucket."
   [ bucket-name ]
   (doseq [ bucket (s3-list-bucket-paged (s3-client) bucket-name)]
@@ -53,5 +53,5 @@
 
 (def subcommands
   #^{:doc "AWS S3 subcommands"}
-  {"ls" #'cmd-list-s3-bucket
-   "catalog" #'cmd-catalog-s3-files})
+  {"catalog" #'cmd-s3-catalog
+   "ls" #'cmd-s3-list-bucket})
