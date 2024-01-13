@@ -11,14 +11,16 @@
             [dup-checker.describe :as describe]
             [dup-checker.fs :as fs]
             [dup-checker.gphoto :as gphoto]
-            [dup-checker.s3 :as s3]))
+            [dup-checker.s3 :as s3]
+            [dup-checker.db :as db]))
 
 (def subcommands
-  {"s3" s3/subcommands
-   "catalog" catalog/subcommands
-   "gphoto" gphoto/subcommands
+  {"catalog" catalog/subcommands
+   "db" db/subcommands
+   "describe" describe/subcommands
    "fs" fs/subcommands
-   "describe" describe/subcommands})
+   "gphoto" gphoto/subcommands
+   "s3" s3/subcommands})
 
 (defn- display-help [ cmd-map ]
   (println "\n\nCommand Paths:\n")
