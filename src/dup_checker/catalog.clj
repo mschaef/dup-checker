@@ -140,8 +140,9 @@
   "List all catalogs"
   [ ]
   (table
-   [:name :catalog_id :updated_on :catalog_type [:root_path 50] :n :size ]
-   (query-catalogs)))
+   [:name :catalog_id :updated_on [:catalog_uri 50] :n :size ]
+   (map #(assoc % :catalog_uri (str (:catalog_type %) ":" (:root_path %)))
+    (query-catalogs))))
 
 (defn- get-required-catalog-id [ catalog-name ]
   (or (get-catalog-id catalog-name)
