@@ -21,12 +21,20 @@
                            ["SELECT md5_digest, name FROM file WHERE catalog_id=?"
                             catalog-id]))))
 
-(defn- get-catalog-id [catalog-name ]
+(defn- get-catalog-id [ catalog-name ]
   (query-scalar (sfm/db)
                 [(str "SELECT catalog_id"
                       "  FROM catalog"
                       " WHERE name = ?")
                  catalog-name]))
+
+(defn- get-catalog [ catalog-id ]
+  (query-first (sfm/db)
+               [(str "SELECT catalog.root_path, catalog_type.catalog_type"
+                     "  FROM catalog, catalog_type"
+                     " WHERE catalog_id = ?"
+                     "   AND catalog.catalog_type_id = catalog_type.catalog_type_id")
+                catalog-id]))
 
 (defn- update-catalog-date [ existing-catalog-id ]
   (jdbc/update! (sfm/db)
@@ -119,23 +127,25 @@
     (doseq [ f file-infos ]
       (catalog-file catalog-files catalog-id f))))
 
+(defn- query-catalogs []
+  (query-all (sfm/db)
+             [(str "SELECT catalog.catalog_id, catalog.name, catalog.root_path, catalog.updated_on, count(file_id) as n, sum(file.size) as size, catalog_type.catalog_type"
+                   "  FROM catalog, file, catalog_type"
+                   " WHERE catalog.catalog_id = file.catalog_id"
+                   "   AND catalog.catalog_type_id = catalog_type.catalog_type_id"
+                   " GROUP BY catalog.catalog_id, catalog.name, catalog.updated_on, catalog_type, catalog.root_path"
+                   " ORDER BY catalog_id")]))
+
 (defn- cmd-catalog-list
   "List all catalogs"
   [ ]
   (table
    [:name :catalog_id :updated_on :catalog_type [:root_path 50] :n :size ]
-   (query-all (sfm/db)
-              [(str "SELECT catalog.catalog_id, catalog.name, catalog.root_path, catalog.updated_on, count(file_id) as n, sum(file.size) as size, catalog_type.catalog_type"
-                    "  FROM catalog, file, catalog_type"
-                    " WHERE catalog.catalog_id = file.catalog_id"
-                    "   AND catalog.catalog_type_id = catalog_type.catalog_type_id"
-                    " GROUP BY catalog.catalog_id, catalog.name, catalog.updated_on, catalog_type, catalog.root_path"
-                    " ORDER BY catalog_id")])))
+   (query-catalogs)))
 
 (defn- get-required-catalog-id [ catalog-name ]
   (or (get-catalog-id catalog-name)
       (fail "No known catalog: " catalog-name)))
-
 
 (defn- cmd-catalog-duplicates
   "List all duplicate files in a catalog by MD5 digest."
@@ -233,7 +243,10 @@
              (get-all-catalog-files
               (get-required-catalog-id required-catalog-name))))))
 
-(defn- cmd-catalog-create [ catalog-uri catalog-name ]
+(defn- cmd-catalog-create
+  "Create a catalog rooted at a given URI."
+
+  [ catalog-uri catalog-name ]
   (let [uri (java.net.URI. catalog-uri)
         scheme (.getScheme uri)
         scheme-handler (or (cval :catalog-scheme scheme)
@@ -242,6 +255,18 @@
     (catalog-files
      (ensure-catalog catalog-name scheme-specific-part scheme)
      (scheme-handler scheme-specific-part))))
+
+(defn- cmd-catalog-update
+  "Create a catalog rooted at a given URI."
+
+  [ catalog-name ]
+
+  (let [catalog-id (get-required-catalog-id catalog-name)
+        {scheme :catalog_type
+         scheme-specific-part :root_path} (get-catalog catalog-id)
+        scheme-handler (or (cval :catalog-scheme scheme)
+                           (fail "Unknown scheme: " scheme))]
+      (catalog-files catalog-id (scheme-handler scheme-specific-part))))
 
 (def subcommands
   #^{:doc "Catalog subcommands"}
@@ -256,4 +281,5 @@
    "export" #'cmd-catalog-export
    "import" #'cmd-catalog-import
 
-   "create" #'cmd-catalog-create})
+   "create" #'cmd-catalog-create
+   "update" #'cmd-catalog-update})

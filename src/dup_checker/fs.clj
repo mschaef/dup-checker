@@ -21,15 +21,3 @@
     (let [ root (clojure.java.io/file root-path)]
       (map #(file-info root %)
            (filter #(.isFile %) (file-seq root))))))
-
-(defn- cmd-catalog-fs-files
-  "Catalog the contents of an filesystem path."
-  [ root-path catalog-name ]
-
-  (catalog/catalog-files
-   (catalog/ensure-catalog catalog-name root-path "fs")
-   (get-catalog-files root-path)))
-
-(def subcommands
-  #^{:doc "Filesystem subcommands"}
-  {"catalog" #'cmd-catalog-fs-files})

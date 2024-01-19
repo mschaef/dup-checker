@@ -19,7 +19,6 @@
   {"catalog" catalog/subcommands
    "db" db/subcommands
    "describe" describe/subcommands
-   "fs" fs/subcommands
    "gphoto" gphoto/subcommands
    "s3" s3/subcommands})
 
