@@ -7,6 +7,7 @@
             [sql-file.core :as sql-file]
             [sql-file.middleware :as sfm]
             [taoensso.timbre :as log]
+            [playbook.config :as config]
             [dup-checker.catalog :as catalog]
             [dup-checker.describe :as describe]
             [dup-checker.fs :as fs]
@@ -59,7 +60,12 @@
    :schema-path [ "sql/" ]
    :schemas (config/cval :db :schemas)})
 
+(def catalog-scheme-handlers
+  {"fs" (fs/get-catalog-files)
+   "s3" (s3/get-catalog-files)})
+
 (defmain [& args]
-  (sql-file/with-pool [db-conn (db-conn-spec)]
-    (sfm/with-db-connection db-conn
-      (dispatch-subcommand subcommands args))))
+  (config/with-extended-config {:catalog-scheme catalog-scheme-handlers}
+    (sql-file/with-pool [db-conn (db-conn-spec)]
+      (sfm/with-db-connection db-conn
+        (dispatch-subcommand subcommands args)))))

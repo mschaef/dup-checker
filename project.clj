@@ -13,7 +13,7 @@
                   :exclusions [com.fasterxml.jackson.core/jackson-core]]
                  [org.clojure/core.async "1.6.681"]
                  ;; TODO: This brings in an awful lot for a CLI app.
-                 [com.mschaef/playbook "0.1.0"]]
+                 [com.mschaef/playbook "0.1.2"]]
 
   :repl-options {:init-ns dup-checker.core}
 

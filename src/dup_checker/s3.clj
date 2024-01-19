@@ -36,6 +36,11 @@
                        (.build))
                 (software.amazon.awssdk.core.sync.ResponseTransformer/toInputStream))})
 
+(defn get-catalog-files []
+  (let [ s3 (s3-client )]
+    (fn[ bucket-name ]
+      (map (partial s3-blob-info s3 bucket-name) (s3-list-bucket-paged s3 bucket-name)))))
+
 (defn- cmd-s3-catalog
   "Catalog the contents of an s3 bucket."
   [ bucket-name catalog-name ]
@@ -43,7 +48,7 @@
   (let [ s3 (s3-client) ]
     (catalog/catalog-files
      (catalog/ensure-catalog catalog-name bucket-name "s3")
-     (map (partial s3-blob-info s3 bucket-name) (s3-list-bucket-paged s3 bucket-name)))))
+     (get-catalog-files bucket-name))))
 
 (defn- cmd-s3-list-bucket
   "List the contents of an s3 bucket."

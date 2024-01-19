@@ -16,13 +16,19 @@
      :size (.length f)
      :data-stream-fn #(io/input-stream f)}))
 
+(defn get-catalog-files []
+  (fn [ root-path ]
+    (let [ root (clojure.java.io/file root-path)]
+      (map #(file-info root %)
+           (filter #(.isFile %) (file-seq root))))))
+
 (defn- cmd-catalog-fs-files
   "Catalog the contents of an filesystem path."
   [ root-path catalog-name ]
 
-  (let [root (clojure.java.io/file root-path)]
-    (catalog/catalog-files (catalog/ensure-catalog catalog-name root-path "fs")
-                           (map #(file-info root %) (filter #(.isFile %) (file-seq root))))))
+  (catalog/catalog-files
+   (catalog/ensure-catalog catalog-name root-path "fs")
+   (get-catalog-files root-path)))
 
 (def subcommands
   #^{:doc "Filesystem subcommands"}

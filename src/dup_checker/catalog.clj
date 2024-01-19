@@ -1,7 +1,8 @@
 (ns dup-checker.catalog
   (:use playbook.core
         sql-file.sql-util
-        dup-checker.util)
+        dup-checker.util
+        playbook.config)
   (:require [clojure.pprint :as pprint]
             [taoensso.timbre :as log]
             [clj-commons.digest :as digest]
@@ -232,6 +233,16 @@
              (get-all-catalog-files
               (get-required-catalog-id required-catalog-name))))))
 
+(defn- cmd-catalog-create [ catalog-uri catalog-name ]
+  (let [uri (java.net.URI. catalog-uri)
+        scheme (.getScheme uri)
+        scheme-handler (or (cval :catalog-scheme scheme)
+                           (fail "Unknown scheme: " catalog-uri))
+        scheme-specific-part (.getSchemeSpecificPart uri)]
+    (catalog-files
+     (ensure-catalog catalog-name scheme-specific-part scheme)
+     (scheme-handler scheme-specific-part))))
+
 (def subcommands
   #^{:doc "Catalog subcommands"}
   {"ls" #'cmd-catalog-list
@@ -243,4 +254,6 @@
    "duplicates" #'cmd-catalog-duplicates
 
    "export" #'cmd-catalog-export
-   "import" #'cmd-catalog-import})
+   "import" #'cmd-catalog-import
+
+   "create" #'cmd-catalog-create})
