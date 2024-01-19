@@ -129,7 +129,7 @@
 
 (defn- query-catalogs []
   (query-all (sfm/db)
-             [(str "SELECT catalog.catalog_id, catalog.name, catalog.root_path, catalog.updated_on, count(file_id) as n, sum(file.size) as size, catalog_type.catalog_type"
+             [(str "SELECT catalog.catalog_id, catalog.name, catalog.root_path, catalog.created_on, catalog.updated_on, count(file_id) as n, sum(file.size) as size, catalog_type.catalog_type"
                    "  FROM catalog, file, catalog_type"
                    " WHERE catalog.catalog_id = file.catalog_id"
                    "   AND catalog.catalog_type_id = catalog_type.catalog_type_id"
@@ -140,7 +140,7 @@
   "List all catalogs"
   [ ]
   (table
-   [:name :catalog_id :updated_on [:catalog_uri 50] :n :size ]
+   [:name :created_on :updated_on [:catalog_uri 50] :n :size ]
    (map #(assoc % :catalog_uri (str (:catalog_type %) ":" (:root_path %)))
     (query-catalogs))))
 

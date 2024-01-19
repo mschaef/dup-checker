@@ -16,6 +16,7 @@
    :size 11
    :gphoto_id 100
    :creation_time 23
+   :created_on 23
    :updated_on 23
    :last_modified_on 23
    :n 8})
