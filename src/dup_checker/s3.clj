@@ -36,10 +36,11 @@
                        (.build))
                 (software.amazon.awssdk.core.sync.ResponseTransformer/toInputStream))})
 
-(defn get-catalog-files []
-  (let [ s3 (s3-client )]
-    (fn[ bucket-name ]
-      (map (partial s3-blob-info s3 bucket-name) (s3-list-bucket-paged s3 bucket-name)))))
+(defn get-store [ bucket-name ]
+  (let [ s3 (s3-client) ]
+    (reify catalog/AFileStore
+      (get-store-files [ this ]
+        (map (partial s3-blob-info s3 bucket-name) (s3-list-bucket-paged s3 bucket-name))))))
 
 (defn- cmd-s3-list-bucket
   "List the contents of an s3 bucket."

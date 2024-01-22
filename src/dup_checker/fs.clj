@@ -16,8 +16,10 @@
      :size (.length f)
      :data-stream-fn #(io/input-stream f)}))
 
-(defn get-catalog-files []
-  (fn [ root-path ]
-    (let [ root (clojure.java.io/file root-path)]
-      (map #(file-info root %)
-           (filter #(.isFile %) (file-seq root))))))
+
+(defn get-store [ root-path ]
+  (reify catalog/AFileStore
+    (get-store-files [ this ]
+      (let [ root (clojure.java.io/file root-path)]
+        (map #(file-info root %)
+             (filter #(.isFile %) (file-seq root)))))))

@@ -60,8 +60,8 @@
    :schemas (config/cval :db :schemas)})
 
 (def catalog-scheme-handlers
-  {"fs" (fs/get-catalog-files)
-   "s3" (s3/get-catalog-files)})
+  {"fs" fs/get-store
+   "s3" s3/get-store})
 
 (defmain [& args]
   (config/with-extended-config {:catalog-scheme catalog-scheme-handlers}

@@ -9,6 +9,13 @@
             [clojure.java.jdbc :as jdbc]
             [sql-file.middleware :as sfm]))
 
+
+(defprotocol AFileStore
+  "A catalogable store for files."
+
+  (get-store-files [ this ] "Return a sequence of files in the storee."))
+
+
 (defn all-filenames-by-digest [ ]
   (into {} (map (fn [ value ]
                   [(:md5_digest value) (:name value)])
@@ -122,9 +129,9 @@
                      :last_modified_on (:last-modified-on file-info)
                      :md5_digest (file-md5-digest file-info)}))))
 
-(defn catalog-files [ catalog-id file-infos ]
+(defn catalog-files [ catalog-id file-store ]
   (let [catalog-files (get-catalog-file-names catalog-id)]
-    (doseq [ f file-infos ]
+    (doseq [ f (get-store-files file-store) ]
       (catalog-file catalog-files catalog-id f))))
 
 (defn- query-catalogs []
@@ -244,18 +251,21 @@
              (get-all-catalog-files
               (get-required-catalog-id required-catalog-name))))))
 
+(defn- get-store [ scheme scheme-specific-part]
+  (let [ store (or (cval :catalog-scheme scheme)
+                   (fail "Unknown scheme: " scheme))]
+    (store scheme-specific-part)))
+
 (defn- cmd-catalog-create
   "Create a catalog rooted at a given URI."
 
   [ catalog-uri catalog-name ]
   (let [uri (java.net.URI. catalog-uri)
         scheme (.getScheme uri)
-        scheme-handler (or (cval :catalog-scheme scheme)
-                           (fail "Unknown scheme: " catalog-uri))
         scheme-specific-part (.getSchemeSpecificPart uri)]
     (catalog-files
      (ensure-catalog catalog-name scheme-specific-part scheme)
-     (scheme-handler scheme-specific-part))))
+     (get-store scheme scheme-specific-part))))
 
 (defn- cmd-catalog-update
   "Create a catalog rooted at a given URI."
@@ -264,10 +274,8 @@
 
   (let [catalog-id (get-required-catalog-id catalog-name)
         {scheme :catalog_type
-         scheme-specific-part :root_path} (get-catalog catalog-id)
-        scheme-handler (or (cval :catalog-scheme scheme)
-                           (fail "Unknown scheme: " scheme))]
-      (catalog-files catalog-id (scheme-handler scheme-specific-part))))
+         scheme-specific-part :root_path} (get-catalog catalog-id)]
+      (catalog-files catalog-id (get-store scheme scheme-specific-part))))
 
 (def subcommands
   #^{:doc "Catalog subcommands"}
