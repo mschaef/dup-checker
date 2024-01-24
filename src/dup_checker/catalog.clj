@@ -7,14 +7,8 @@
             [taoensso.timbre :as log]
             [clj-commons.digest :as digest]
             [clojure.java.jdbc :as jdbc]
-            [sql-file.middleware :as sfm]))
-
-
-(defprotocol AFileStore
-  "A catalogable store for files."
-
-  (get-store-files [ this ] "Return a sequence of files in the storee."))
-
+            [sql-file.middleware :as sfm]
+            [dup-checker.store :as store]))
 
 (defn all-filenames-by-digest [ ]
   (into {} (map (fn [ value ]
@@ -131,7 +125,7 @@
 
 (defn catalog-files [ catalog-id file-store ]
   (let [catalog-files (get-catalog-file-names catalog-id)]
-    (doseq [ f (get-store-files file-store) ]
+    (doseq [ f (store/get-store-files file-store) ]
       (catalog-file catalog-files catalog-id f))))
 
 (defn- query-catalogs []

@@ -4,7 +4,8 @@
   (:require [clojure.pprint :as pprint]
             [taoensso.timbre :as log]
             [clojure.java.io :as io]
-            [dup-checker.catalog :as catalog]))
+            [dup-checker.catalog :as catalog]
+            [dup-checker.store :as store]))
 
 (defn- file-info [ root f ]
   (let [path (.getCanonicalPath f)]
@@ -18,7 +19,7 @@
 
 
 (defn get-store [ root-path ]
-  (reify catalog/AFileStore
+  (reify store/AFileStore
     (get-store-files [ this ]
       (let [ root (clojure.java.io/file root-path)]
         (map #(file-info root %)

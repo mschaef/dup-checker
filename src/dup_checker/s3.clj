@@ -4,7 +4,8 @@
   (:require [clojure.pprint :as pprint]
             [taoensso.timbre :as log]
             [clj-http.client :as http]
-            [dup-checker.catalog :as catalog]))
+            [dup-checker.catalog :as catalog]
+            [dup-checker.store :as store]))
 
 (defn- s3-client []
   (-> (software.amazon.awssdk.services.s3.S3Client/builder)
@@ -38,7 +39,7 @@
 
 (defn get-store [ bucket-name ]
   (let [ s3 (s3-client) ]
-    (reify catalog/AFileStore
+    (reify store/AFileStore
       (get-store-files [ this ]
         (map (partial s3-blob-info s3 bucket-name) (s3-list-bucket-paged s3 bucket-name))))))
 
