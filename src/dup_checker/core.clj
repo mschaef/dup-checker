@@ -59,12 +59,12 @@
    :schema-path [ "sql/" ]
    :schemas (config/cval :db :schemas)})
 
-(def catalog-scheme-handlers
+(def store-schemes
   {"fs" fs/get-store
    "s3" s3/get-store})
 
 (defmain [& args]
-  (config/with-extended-config {:catalog-scheme catalog-scheme-handlers}
+  (config/with-extended-config {:store-scheme store-schemes}
     (sql-file/with-pool [db-conn (db-conn-spec)]
       (sfm/with-db-connection db-conn
         (dispatch-subcommand subcommands args)))))

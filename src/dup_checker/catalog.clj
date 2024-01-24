@@ -64,10 +64,12 @@
                    :root_path root-path
                    :hostname (current-hostname)}) )
 
-(defn ensure-catalog [ catalog-name root-path catalog-type ]
-  (if-let [ existing-catalog-id (get-catalog-id catalog-name ) ]
-    (update-catalog-date existing-catalog-id)
-    (create-catalog catalog-name root-path catalog-type)))
+(defn ensure-catalog [ catalog-name store-uri ]
+  (let [catalog-type (.getScheme store-uri)
+        root-path (.getSchemeSpecificPart store-uri)]
+    (if-let [ existing-catalog-id (get-catalog-id catalog-name) ]
+      (update-catalog-date existing-catalog-id)
+      (create-catalog catalog-name root-path catalog-type))))
 
 (defn- file-cataloged? [ catalog-id file-info ]
   (> (query-scalar (sfm/db)
@@ -245,31 +247,21 @@
              (get-all-catalog-files
               (get-required-catalog-id required-catalog-name))))))
 
-(defn- get-store [ scheme scheme-specific-part]
-  (let [ store (or (cval :catalog-scheme scheme)
-                   (fail "Unknown scheme: " scheme))]
-    (store scheme-specific-part)))
-
 (defn- cmd-catalog-create
   "Create a catalog rooted at a given URI."
 
-  [ catalog-uri catalog-name ]
-  (let [uri (java.net.URI. catalog-uri)
-        scheme (.getScheme uri)
-        scheme-specific-part (.getSchemeSpecificPart uri)]
-    (catalog-files
-     (ensure-catalog catalog-name scheme-specific-part scheme)
-     (get-store scheme scheme-specific-part))))
+  [ catalog-name store-uri ]
+  (let [uri (java.net.URI. store-uri)]
+    (catalog-files (ensure-catalog catalog-name uri) (store/get-store uri))))
 
 (defn- cmd-catalog-update
   "Create a catalog rooted at a given URI."
 
   [ catalog-name ]
-
   (let [catalog-id (get-required-catalog-id catalog-name)
         {scheme :catalog_type
          scheme-specific-part :root_path} (get-catalog catalog-id)]
-      (catalog-files catalog-id (get-store scheme scheme-specific-part))))
+    (catalog-files catalog-id (store/get-store (java.net.URI. scheme scheme-specific-part nil)))))
 
 (def subcommands
   #^{:doc "Catalog subcommands"}
