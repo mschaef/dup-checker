@@ -86,7 +86,7 @@
              [(str "SELECT *"
                    "  FROM file"
                    " WHERE file.catalog_id = ?"
-                   " ORDER BY md5_digest")
+                   " ORDER BY name")
               catalog-id]))
 
 (defn- get-catalog-file-names [ catalog-id ]
@@ -137,7 +137,7 @@
                    " WHERE catalog.catalog_id = file.catalog_id"
                    "   AND catalog.catalog_type_id = catalog_type.catalog_type_id"
                    " GROUP BY catalog.catalog_id, catalog.name, catalog.updated_on, catalog_type, catalog.root_path"
-                   " ORDER BY catalog_id")]))
+                   " ORDER BY catalog.name")]))
 
 (defn- cmd-catalog-list
   "List all catalogs"

@@ -1,0 +1,3 @@
+* Exclude files based on a flag (extension, name match)
+* Name/organize files based on date/digest, etc.
+* Populate missing files into a file system store
