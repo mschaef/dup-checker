@@ -18,6 +18,7 @@
                      [(str "SELECT * FROM ("
                            "   SELECT md5_digest, count(md5_digest) as count"
                            "     FROM file"
+                           "    WHERE NOT excluded"
                            "    GROUP BY md5_digest)"
                            " WHERE count > 1"
                            " ORDER BY count")])))))
@@ -29,10 +30,12 @@
   (table
    [:catalog_name :last_modified_on :size :file_name]
    (query-all (sfm/db)
-              [(str "SELECT file.name as file_name, catalog.name as catalog_name, file.size, file.last_modified_on"
+              [(str "SELECT file.name as file_name, catalog.name as catalog_name,"
+                    "       file.size, file.last_modified_on"
                     "  FROM file, catalog"
                     " WHERE md5_digest=?"
                     "  AND file.catalog_id=catalog.catalog_id"
+                    "  AND NOT file.excluded"
                     " ORDER BY catalog_name")
                md5-digest]))
   (println))
@@ -55,7 +58,8 @@
               [(str "SELECT file.name as file_name, catalog.name as catalog_name, file.size, file.last_modified_on, md5_digest"
                     "  FROM file, catalog"
                     " WHERE INSTR(file.name, ?) > 0"
-                    "  AND file.catalog_id=catalog.catalog_id"
+                    "   AND file.catalog_id=catalog.catalog_id"
+                    "   AND NOT file.excluded"
                     " ORDER BY catalog_name")
                filename-segment]))
   (println))

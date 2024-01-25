@@ -1,6 +1,6 @@
 {:app {:name "dup-checker"}
  :db {:subname "dup-checker"
-      :schemas [[ "dup-checker" 5 ]]}
+      :schemas [[ "dup-checker" 6 ]]}
 
  :log-levels
   [[#{"hsqldb.*" "com.zaxxer.hikari.*"} :warn]

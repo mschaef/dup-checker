@@ -13,13 +13,17 @@
 (defn all-filenames-by-digest [ ]
   (into {} (map (fn [ value ]
                   [(:md5_digest value) (:name value)])
-                (query-all (sfm/db) "SELECT md5_digest, name FROM file"))))
+                (query-all (sfm/db) (str "SELECT md5_digest, name"
+                                         "  FROM file"
+                                         " WHERE NOT excluded")))))
 
 (defn catalog-filenames-by-digest [ catalog-id ]
   (into {} (map (fn [ value ]
                   [(:md5_digest value) (:name value)])
                 (query-all (sfm/db)
-                           ["SELECT md5_digest, name FROM file WHERE catalog_id=?"
+                           [(str "SELECT md5_digest, name"
+                                 "  FROM file"
+                                 "  WHERE catalog_id=? AND NOT excluded")
                             catalog-id]))))
 
 (defn- get-catalog-id [ catalog-name ]
@@ -76,7 +80,7 @@
                    [(str "SELECT COUNT(file_id)"
                          "  FROM file"
                          " WHERE file.name = ?"
-                         "  AND file.catalog_id = ?")
+                         "   AND file.catalog_id = ?")
                     (:name file-info)
                     catalog-id])
      0))
@@ -86,6 +90,7 @@
              [(str "SELECT *"
                    "  FROM file"
                    " WHERE file.catalog_id = ?"
+                   "   AND NOT excluded"
                    " ORDER BY name")
               catalog-id]))
 
@@ -132,7 +137,9 @@
 
 (defn- query-catalogs []
   (query-all (sfm/db)
-             [(str "SELECT catalog.catalog_id, catalog.name, catalog.root_path, catalog.created_on, catalog.updated_on, count(file_id) as n, sum(file.size) as size, catalog_type.catalog_type"
+             [(str "SELECT catalog.catalog_id, catalog.name, catalog.root_path, catalog.created_on,"
+                   "       catalog.updated_on, count(file_id) as n, sum(CASE WHEN excluded THEN 1 ELSE 0 END) as excluded,"
+                   "       sum(file.size) as size, catalog_type.catalog_type"
                    "  FROM catalog, file, catalog_type"
                    " WHERE catalog.catalog_id = file.catalog_id"
                    "   AND catalog.catalog_type_id = catalog_type.catalog_type_id"
@@ -143,7 +150,7 @@
   "List all catalogs"
   [ ]
   (table
-   [:name :created_on :updated_on [:catalog_uri 50] :n :size ]
+   [:name :created_on :updated_on [:catalog_uri 50] :n :excluded :size ]
    (map #(assoc % :catalog_uri (str (:catalog_type %) ":" (:root_path %)))
     (query-catalogs))))
 
@@ -165,6 +172,7 @@
                            "   SELECT md5_digest, count(md5_digest) as count"
                            "     FROM file"
                            "   WHERE catalog_id=?"
+                           "     AND NOT excluded"
                            "    GROUP BY md5_digest)"
                            " WHERE count > 1"
                            " ORDER BY count")
