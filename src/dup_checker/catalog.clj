@@ -158,7 +158,7 @@
   (or (get-catalog-id catalog-name)
       (fail "No known catalog: " catalog-name)))
 
-(defn- cmd-catalog-duplicates
+(defn- cmd-catalog-file-duplicates
   "List all duplicate files in a catalog by MD5 digest."
   [ catalog-name ]
 
@@ -178,7 +178,7 @@
                            " ORDER BY count")
                       catalog-id])))))
 
-(defn- cmd-catalog-list-files
+(defn- cmd-catalog-file-list
   "List all files present in a catalog."
   [ catalog-name ]
 
@@ -243,7 +243,7 @@
                   [(:md5_digest value) value])
                 (get-all-catalog-files (get-required-catalog-id catalog-name)))))
 
-(defn- cmd-catalog-list-missing
+(defn- cmd-catalog-file-missing
   "Identify files missing in a given catalog."
 
   [ catalog-name required-catalog-name ]
@@ -282,20 +282,20 @@
                     {:excluded true}
                     ["catalog_id=? AND extension=?" catalog-id ext]))))
 
+(def file-subcommands
+  #^{:doc "Commands for operating on files within catalogs."}
+  {"duplicates" #'cmd-catalog-file-duplicates
+   "ls" #'cmd-catalog-file-list
+   "missing" #'cmd-catalog-file-missing})
+
 (def subcommands
   #^{:doc "Catalog subcommands"}
-  {"ls" #'cmd-catalog-list
-   "list-files" #'cmd-catalog-list-files
+  {"create" #'cmd-catalog-create
+   "exclude-extension" #'cmd-catalog-exclude-extension
+   "export" #'cmd-catalog-export
+   "file" file-subcommands
+   "import" #'cmd-catalog-import
+   "ls" #'cmd-catalog-list
    "rm" #'cmd-catalog-remove
    "set-root" #'cmd-catalog-set-root
-
-   "list-missing" #'cmd-catalog-list-missing
-   "duplicates" #'cmd-catalog-duplicates
-
-   "export" #'cmd-catalog-export
-   "import" #'cmd-catalog-import
-
-   "create" #'cmd-catalog-create
-   "update" #'cmd-catalog-update
-
-   "exclude-extension" #'cmd-catalog-exclude-extension})
+   "update" #'cmd-catalog-update})
