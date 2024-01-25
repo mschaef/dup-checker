@@ -272,7 +272,7 @@
     (catalog-files catalog-id (store/get-store (java.net.URI. scheme scheme-specific-part nil)))))
 
 (defn- cmd-catalog-exclude-extension
-  "Set the exclusion flag on a group of files identified by their extension."
+  "Exclude files from a catalog by their extension."
 
   [ catalog-name & extensions ]
   (let [catalog-id (get-required-catalog-id catalog-name)]
@@ -282,16 +282,38 @@
                     {:excluded true}
                     ["catalog_id=? AND extension=?" catalog-id ext]))))
 
+(defn- cmd-catalog-exclude-catalog
+  "Exclude files from a catalog that are already in another catalog."
+
+  [ catalog-name other-catalog-name]
+  (let [catalog-id (get-required-catalog-id catalog-name)
+        other-catalog-id (get-required-catalog-id other-catalog-name)]
+    (jdbc/execute! (sfm/db)
+                   [(str "UPDATE file"
+                         "   SET excluded=true"
+                         " WHERE catalog_id=?"
+                         "   AND md5_digest in (SELECT md5_digest"
+                         "                        FROM file"
+                         "                       WHERE NOT excluded"
+                         "                         AND catalog_id=?)")
+                    catalog-id
+                    other-catalog-id])))
+
 (def file-subcommands
   #^{:doc "Commands for operating on files within catalogs."}
   {"duplicates" #'cmd-catalog-file-duplicates
    "ls" #'cmd-catalog-file-list
    "missing" #'cmd-catalog-file-missing})
 
+(def exclude-subcommands
+  #^{:doc "Commands for marking files within a catalog as excluded."}
+  {"extension" #'cmd-catalog-exclude-extension
+   "catalog" #'cmd-catalog-exclude-catalog})
+
 (def subcommands
   #^{:doc "Catalog subcommands"}
   {"create" #'cmd-catalog-create
-   "exclude-extension" #'cmd-catalog-exclude-extension
+   "exclude" exclude-subcommands
    "export" #'cmd-catalog-export
    "file" file-subcommands
    "import" #'cmd-catalog-import
