@@ -271,6 +271,17 @@
          scheme-specific-part :root_path} (get-catalog catalog-id)]
     (catalog-files catalog-id (store/get-store (java.net.URI. scheme scheme-specific-part nil)))))
 
+(defn- cmd-catalog-exclude-extension
+  "Set the exclusion flag on a group of files identified by their extension."
+
+  [ catalog-name & extensions ]
+  (let [catalog-id (get-required-catalog-id catalog-name)]
+    (doseq [ ext extensions ]
+      (jdbc/update! (sfm/db)
+                    :file
+                    {:excluded true}
+                    ["catalog_id=? AND extension=?" catalog-id ext]))))
+
 (def subcommands
   #^{:doc "Catalog subcommands"}
   {"ls" #'cmd-catalog-list
@@ -285,4 +296,6 @@
    "import" #'cmd-catalog-import
 
    "create" #'cmd-catalog-create
-   "update" #'cmd-catalog-update})
+   "update" #'cmd-catalog-update
+
+   "exclude-extension" #'cmd-catalog-exclude-extension})
