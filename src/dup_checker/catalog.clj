@@ -85,14 +85,31 @@
                     catalog-id])
      0))
 
-(defn- get-all-catalog-files [ catalog-id ]
-  (query-all (sfm/db)
-             [(str "SELECT *"
-                   "  FROM file"
-                   " WHERE file.catalog_id = ?"
-                   "   AND NOT excluded"
-                   " ORDER BY name")
-              catalog-id]))
+(defn- get-excluded-catalog-files [ catalog-id]
+   (query-all (sfm/db)
+              [(str "SELECT *"
+                    "  FROM file"
+                    " WHERE file.catalog_id = ?"
+                    "   AND excluded"
+                    " ORDER BY name")
+               catalog-id]))
+
+(defn- get-all-catalog-files
+  ([ catalog-id file-pattern ]
+   (query-all (sfm/db)
+              (cond->
+                  [(str "SELECT *"
+                        "  FROM file"
+                        " WHERE file.catalog_id = ?"
+                        "   AND NOT excluded"
+                        (when file-pattern
+                          (str "  AND file.name like ?"))
+                        " ORDER BY name")
+                   catalog-id]
+                file-pattern (conj file-pattern))))
+
+  ([ catalog-id ]
+   (get-all-catalog-files catalog-id nil)))
 
 (defn- get-catalog-file-names [ catalog-id ]
   (set (map :name (get-all-catalog-files catalog-id))))
@@ -180,11 +197,15 @@
 
 (defn- cmd-catalog-file-list
   "List all files present in a catalog."
-  [ catalog-name ]
 
-  (table
-   [:md5_digest :size :name]
-   (get-all-catalog-files (get-required-catalog-id catalog-name))))
+  ([ catalog-name file-pattern ]
+   (table
+    [:md5_digest :size :name]
+    (get-all-catalog-files (get-required-catalog-id catalog-name)
+                           file-pattern)))
+
+  ([ catalog-name ]
+   (cmd-catalog-file-list catalog-name nil)))
 
 (defn- cmd-catalog-remove
   "Remove a catalog."
@@ -282,6 +303,25 @@
                     {:excluded true}
                     ["catalog_id=? AND extension=?" catalog-id ext]))))
 
+(defn- cmd-catalog-excluded-list
+  "List excluded files in a catalog."
+
+  [ catalog-name ]
+
+  (table
+   [:md5_digest :size :name]
+   (get-excluded-catalog-files (get-required-catalog-id catalog-name))))
+
+(defn- cmd-catalog-exclude-pattern
+  "Exclude files from a catalog that match a specific fileame pattern."
+
+  [ catalog-name file-pattern]
+  (let [catalog-id (get-required-catalog-id catalog-name)]
+    (jdbc/update! (sfm/db)
+                  :file
+                  {:excluded true}
+                  ["catalog_id=? AND name LIKE ?" catalog-id file-pattern])))
+
 (defn- cmd-catalog-exclude-catalog
   "Exclude files from a catalog that are already in another catalog."
 
@@ -320,8 +360,10 @@
 
 (def exclude-subcommands
   #^{:doc "Commands for marking files within a catalog as excluded."}
-  {"extension" #'cmd-catalog-exclude-extension
-   "catalog" #'cmd-catalog-exclude-catalog
+  {"catalog" #'cmd-catalog-exclude-catalog
+   "extension" #'cmd-catalog-exclude-extension
+   "ls" #'cmd-catalog-excluded-list
+   "pattern" #'cmd-catalog-exclude-pattern
    "reset" #'cmd-catalog-exclude-reset})
 
 (def subcommands
