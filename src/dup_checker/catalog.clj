@@ -285,19 +285,32 @@
 (defn- cmd-catalog-exclude-catalog
   "Exclude files from a catalog that are already in another catalog."
 
-  [ catalog-name other-catalog-name]
+  [ catalog-name & other-catalog-names ]
   (let [catalog-id (get-required-catalog-id catalog-name)
-        other-catalog-id (get-required-catalog-id other-catalog-name)]
-    (jdbc/execute! (sfm/db)
-                   [(str "UPDATE file"
-                         "   SET excluded=true"
-                         " WHERE catalog_id=?"
-                         "   AND md5_digest in (SELECT md5_digest"
-                         "                        FROM file"
-                         "                       WHERE NOT excluded"
-                         "                         AND catalog_id=?)")
-                    catalog-id
-                    other-catalog-id])))
+        other-catalog-ids (map get-required-catalog-id other-catalog-names)]
+    (doseq [ other-catalog-id other-catalog-ids ]
+      (jdbc/execute! (sfm/db)
+                     [(str "UPDATE file"
+                           "   SET excluded=true"
+                           " WHERE catalog_id=?"
+                           "   AND md5_digest in (SELECT md5_digest"
+                           "                        FROM file"
+                           "                       WHERE NOT excluded"
+                           "                         AND catalog_id=?)")
+                      catalog-id
+                      other-catalog-id]))))
+
+(defn- cmd-catalog-exclude-reset
+  "Reset all catalog file exclusions."
+
+  [ & catalog-names ]
+  (let [catalog-ids (map get-required-catalog-id catalog-names)]
+    (doseq [ catalog-id catalog-ids ]
+      (jdbc/update! (sfm/db)
+                    :file
+                    {:excluded false}
+                    ["catalog_id=?" catalog-id]))))
+
 
 (def file-subcommands
   #^{:doc "Commands for operating on files within catalogs."}
@@ -308,7 +321,8 @@
 (def exclude-subcommands
   #^{:doc "Commands for marking files within a catalog as excluded."}
   {"extension" #'cmd-catalog-exclude-extension
-   "catalog" #'cmd-catalog-exclude-catalog})
+   "catalog" #'cmd-catalog-exclude-catalog
+   "reset" #'cmd-catalog-exclude-reset})
 
 (def subcommands
   #^{:doc "Catalog subcommands"}
