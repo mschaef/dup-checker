@@ -5,7 +5,9 @@
 (defprotocol AFileStore
   "A catalogable store for files."
 
-  (get-store-files [ this ] "Return a sequence of files in the storee."))
+  (get-store-files [ this ] "Return a sequence of files in the store.")
+
+  (link-store-file [ this file ] "Create a link from this store to a file in another."))
 
 (defn get-store [ uri ]
   (let [scheme (.getScheme uri)

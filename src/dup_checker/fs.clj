@@ -23,4 +23,7 @@
     (get-store-files [ this ]
       (let [ root (clojure.java.io/file root-path)]
         (map #(file-info root %)
-             (filter #(.isFile %) (file-seq root)))))))
+             (filter #(.isFile %) (file-seq root)))))
+
+    (link-store-file [ this file ]
+      (fail "Unsupported"))))

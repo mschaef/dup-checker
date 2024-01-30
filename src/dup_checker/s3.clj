@@ -41,7 +41,10 @@
   (let [ s3 (s3-client) ]
     (reify store/AFileStore
       (get-store-files [ this ]
-        (map (partial s3-blob-info s3 bucket-name) (s3-list-bucket-paged s3 bucket-name))))))
+        (map (partial s3-blob-info s3 bucket-name) (s3-list-bucket-paged s3 bucket-name)))
+
+      (link-store-file [ this file ]
+        (fail "Unsupported")))))
 
 (defn- cmd-s3-list-bucket
   "List the contents of an s3 bucket."

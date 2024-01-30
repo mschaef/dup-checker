@@ -264,6 +264,37 @@
                   [(:md5_digest value) value])
                 (get-all-catalog-files (get-required-catalog-id catalog-name)))))
 
+(defn- file-path [ & segs ]
+  (.getCanonicalPath (apply clojure.java.io/file segs)))
+
+(defn- cmd-catalog-link
+  "Extend the catalog with missing files from another catalog via links."
+
+  [ catalog-name other-catalog-name ]
+  (let [catalog-id (get-required-catalog-id catalog-name)
+        other-catalog-id (get-required-catalog-id other-catalog-name)
+        current-catalog-files (catalog-files-by-digest catalog-name)
+        catalog-root (:root_path (get-catalog catalog-id))
+        other-catalog-root (:root_path (get-catalog other-catalog-id))]
+
+    (doseq [ file (remove #(get current-catalog-files (:md5_digest %))
+                          (get-all-catalog-files other-catalog-id))]
+
+      (let [target-path (.getParent (.toPath (java.io.File. (file-path catalog-root (:name file)))))
+            link-target (.toPath (java.io.File. (file-path catalog-root (:name file))))
+            link-source (.toPath (java.io.File. (file-path other-catalog-root (:name file))))]
+
+        (log/info "Linking: " link-source)
+        (java.nio.file.Files/createDirectories target-path (make-array java.nio.file.attribute.FileAttribute 0))
+        (java.nio.file.Files/createLink link-target link-source)
+        (jdbc/insert! (sfm/db)
+                      :file
+                      (-> file
+                               (dissoc :file_id)
+                               (assoc :catalog_id catalog-id)
+                               (assoc :excluded false)))))))
+
+
 (defn- cmd-catalog-file-missing
   "Identify files missing in a given catalog."
 
@@ -373,6 +404,7 @@
    "export" #'cmd-catalog-export
    "file" file-subcommands
    "import" #'cmd-catalog-import
+   "link" #'cmd-catalog-link
    "ls" #'cmd-catalog-list
    "rm" #'cmd-catalog-remove
    "set-root" #'cmd-catalog-set-root
