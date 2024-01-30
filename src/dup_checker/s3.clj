@@ -43,8 +43,11 @@
       (get-store-files [ this ]
         (map (partial s3-blob-info s3 bucket-name) (s3-list-bucket-paged s3 bucket-name)))
 
-      (link-store-file [ this file ]
-        (fail "Unsupported")))))
+      (get-store-file-path [ this filename ]
+        (fail "Cannot get filesystem path to S3 object: " filename))
+
+      (link-store-file [ this filename source ]
+        (fail "Cannot create filesystem link in S3:" filename)))))
 
 (defn- cmd-s3-list-bucket
   "List the contents of an s3 bucket."

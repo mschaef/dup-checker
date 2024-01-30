@@ -41,6 +41,11 @@
                      "   AND catalog.catalog_type_id = catalog_type.catalog_type_id")
                 catalog-id]))
 
+(defn- get-catalog-store [ catalog-id ]
+  (let [{scheme :catalog_type
+         scheme-specific-part :root_path} (get-catalog catalog-id)]
+    (store/get-store (java.net.URI. scheme scheme-specific-part nil))))
+
 (defn- update-catalog-date [ existing-catalog-id ]
   (jdbc/update! (sfm/db)
                 :catalog
@@ -264,35 +269,33 @@
                   [(:md5_digest value) value])
                 (get-all-catalog-files (get-required-catalog-id catalog-name)))))
 
-(defn- file-path [ & segs ]
-  (.getCanonicalPath (apply clojure.java.io/file segs)))
-
 (defn- cmd-catalog-link
   "Extend the catalog with missing files from another catalog via links."
 
   [ catalog-name other-catalog-name ]
   (let [catalog-id (get-required-catalog-id catalog-name)
         other-catalog-id (get-required-catalog-id other-catalog-name)
-        current-catalog-files (catalog-files-by-digest catalog-name)
-        catalog-root (:root_path (get-catalog catalog-id))
-        other-catalog-root (:root_path (get-catalog other-catalog-id))]
 
-    (doseq [ file (remove #(get current-catalog-files (:md5_digest %))
+        catalog-store (get-catalog-store catalog-id)
+        other-catalog-store (get-catalog-store other-catalog-id)
+
+        current-catalog-files (catalog-files-by-digest catalog-name)]
+
+    (doseq [ other-file (remove #(get current-catalog-files (:md5_digest %))
                           (get-all-catalog-files other-catalog-id))]
 
-      (let [target-path (.getParent (.toPath (java.io.File. (file-path catalog-root (:name file)))))
-            link-target (.toPath (java.io.File. (file-path catalog-root (:name file))))
-            link-source (.toPath (java.io.File. (file-path other-catalog-root (:name file))))]
+      (log/info "Linking: " (:name other-file))
 
-        (log/info "Linking: " link-source)
-        (java.nio.file.Files/createDirectories target-path (make-array java.nio.file.attribute.FileAttribute 0))
-        (java.nio.file.Files/createLink link-target link-source)
-        (jdbc/insert! (sfm/db)
-                      :file
-                      (-> file
-                               (dissoc :file_id)
-                               (assoc :catalog_id catalog-id)
-                               (assoc :excluded false)))))))
+      (if-let [ other-path (store/get-store-file-path other-catalog-store (:name other-file)) ]
+        (do
+          (store/link-store-file catalog-store (:name other-file) other-path)
+          (jdbc/insert! (sfm/db)
+                        :file
+                        (-> other-file
+                            (dissoc :file_id)
+                            (assoc :catalog_id catalog-id)
+                            (assoc :excluded false))))
+        (log/warn "Missing file in other storage: " (:name other-file))))))
 
 
 (defn- cmd-catalog-file-missing
@@ -318,10 +321,8 @@
   "Create a catalog rooted at a given URI."
 
   [ catalog-name ]
-  (let [catalog-id (get-required-catalog-id catalog-name)
-        {scheme :catalog_type
-         scheme-specific-part :root_path} (get-catalog catalog-id)]
-    (catalog-files catalog-id (store/get-store (java.net.URI. scheme scheme-specific-part nil)))))
+  (let [catalog-id (get-required-catalog-id catalog-name)]
+    (catalog-files catalog-id (get-catalog-store catalog-id))))
 
 (defn- cmd-catalog-exclude-extension
   "Exclude files from a catalog by their extension."

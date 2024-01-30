@@ -17,6 +17,9 @@
      :size (.length f)
      :data-stream-fn #(io/input-stream f)}))
 
+(defn- file-path [ & segs ]
+  (.normalize
+   (.toAbsolutePath (.toPath (apply clojure.java.io/file segs)))))
 
 (defn get-store [ root-path ]
   (reify store/AFileStore
@@ -25,5 +28,15 @@
         (map #(file-info root %)
              (filter #(.isFile %) (file-seq root)))))
 
-    (link-store-file [ this file ]
-      (fail "Unsupported"))))
+    (get-store-file-path [ this filename ]
+      (let [path (file-path root-path filename)]
+        (and (.exists (.toFile path))
+             path)))
+
+    (link-store-file [ this filename source ]
+      (let [target-path (file-path root-path filename)]
+        (java.nio.file.Files/createDirectories
+         (.getParent target-path)
+         (make-array java.nio.file.attribute.FileAttribute 0))
+
+        (java.nio.file.Files/createLink target-path source)))))
