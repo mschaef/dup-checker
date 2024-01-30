@@ -157,9 +157,9 @@
              [(str "SELECT catalog.catalog_id, catalog.name, catalog.root_path, catalog.created_on,"
                    "       catalog.updated_on, count(file_id) as n, sum(CASE WHEN excluded THEN 1 ELSE 0 END) as excluded,"
                    "       sum(file.size) as size, catalog_type.catalog_type"
-                   "  FROM catalog, file, catalog_type"
-                   " WHERE catalog.catalog_id = file.catalog_id"
-                   "   AND catalog.catalog_type_id = catalog_type.catalog_type_id"
+                   "  FROM catalog, catalog_type"
+                   "  LEFT JOIN file ON catalog.catalog_id = file.catalog_id"
+                   " WHERE catalog.catalog_type_id = catalog_type.catalog_type_id"
                    " GROUP BY catalog.catalog_id, catalog.name, catalog.updated_on, catalog_type, catalog.root_path"
                    " ORDER BY catalog.name")]))
 
