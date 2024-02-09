@@ -24,18 +24,26 @@
                 (.contents resp))))]
     (s3-list-objects nil)))
 
+(defn- s3-get-object-attributes [ s3 bucket-name f ]
+  (.getObjectAttributes s3 (-> (software.amazon.awssdk.services.s3.model.GetObjectAttributesRequest/builder)
+                               (.bucket bucket-name)
+                               (.key (.key f))
+                               (.build))))
+
+(defn- get-object [ s3 bucket-name f ]
+  (.getObject s3 (-> (software.amazon.awssdk.services.s3.model.GetObjectRequest/builder)
+                     (.bucket bucket-name)
+                     (.key (.key f))
+                     (.build))
+              (software.amazon.awssdk.core.sync.ResponseTransformer/toInputStream)))
+
 (defn- s3-blob-info [ s3 bucket-name f ]
   {:full-path (.key f)
    :extension (get-filename-extension (.key f))
    :last-modified-on (.lastModified f)
    :name (.key f)
    :size (.size f)
-   :data-stream-fn
-   #(.getObject s3 (-> (software.amazon.awssdk.services.s3.model.GetObjectRequest/builder)
-                       (.bucket bucket-name)
-                       (.key (.key f))
-                       (.build))
-                (software.amazon.awssdk.core.sync.ResponseTransformer/toInputStream))})
+   :data-stream-fn #(get-object s3 bucket-name f)})
 
 (defn get-store [ bucket-name ]
   (let [ s3 (s3-client) ]
