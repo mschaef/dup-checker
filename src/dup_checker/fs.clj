@@ -39,4 +39,5 @@
          (.getParent target-path)
          (make-array java.nio.file.attribute.FileAttribute 0))
 
+        (log/info "Creating link at" target-path "from" source)
         (java.nio.file.Files/createLink target-path source)))))
