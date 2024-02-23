@@ -168,13 +168,16 @@
                    " GROUP BY catalog.catalog_id, catalog.name, catalog.updated_on, catalog_type, catalog.root_path"
                    " ORDER BY catalog.name")]))
 
+(defn all-catalogs []
+  (map :name (query-catalogs)))
+
 (defn cmd-catalog-list
   "List all catalogs"
   [ ]
   (table
    [:name :created_on :updated_on [:catalog_uri 50] :n :excluded :size ]
    (map #(assoc % :catalog_uri (str (:catalog_type %) ":" (:root_path %)))
-    (query-catalogs))))
+        (query-catalogs))))
 
 (defn- get-required-catalog-id [ catalog-name ]
   (or (get-catalog-id catalog-name)
@@ -347,12 +350,13 @@
 (defn cmd-catalog-exclude-pattern
   "Exclude files from a catalog that match a specific fileame pattern."
 
-  [ catalog-name file-pattern]
-  (let [catalog-id (get-required-catalog-id catalog-name)]
-    (jdbc/update! (sfm/db)
-                  :file
-                  {:excluded true}
-                  ["catalog_id=? AND name LIKE ?" catalog-id file-pattern])))
+  [ catalog-name & file-pattern ]
+  (doseq [ file-pattern file-pattern ]
+    (let [catalog-id (get-required-catalog-id catalog-name)]
+      (jdbc/update! (sfm/db)
+                    :file
+                    {:excluded true}
+                    ["catalog_id=? AND name LIKE ?" catalog-id file-pattern]))))
 
 (defn cmd-catalog-exclude-catalog
   "Exclude files from a catalog that are already in another catalog."
