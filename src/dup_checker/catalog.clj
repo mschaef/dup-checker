@@ -290,15 +290,18 @@
       (log/info "Linking: " (:name other-file))
 
       (if-let [ other-path (store/get-store-file-path other-catalog-store (:name other-file)) ]
-        (do
+        (try
           (store/link-store-file catalog-store (:name other-file) other-path)
           (jdbc/insert! (sfm/db)
                         :file
                         (-> other-file
                             (dissoc :file_id)
                             (assoc :catalog_id catalog-id)
-                            (assoc :excluded false))))
-        (log/warn "Missing file in other storage: " (:name other-file))))))
+                            (assoc :excluded false)))
+          (catch Exception ex
+            (log/error (str "Error establishing link to " (:name other-file)
+                            " in target catalog: " ex))))
+        (log/warn "Missing file in other storage: "(:name other-file))))))
 
 
 (defn cmd-catalog-file-missing
