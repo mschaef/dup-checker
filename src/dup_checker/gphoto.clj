@@ -69,7 +69,7 @@
                        "  WHEN NOT MATCHED THEN INSERT (refresh_token) VALUES (new_jwt.refresh_token) ")
                   (:refresh_token jwt)]))
 
-(defn- cmd-gphoto-logout
+(defn cmd-gphoto-logout
   "Log out from any currently authenticated Google Photo account."
 
   []
@@ -78,7 +78,7 @@
 (defn- gphoto-oauth-config []
   (:installed (try-parse-json (slurp "google-oauth.json"))))
 
-(defn- cmd-gphoto-login
+(defn cmd-gphoto-login
   "Login to a Google Photo account."
 
   []
@@ -124,7 +124,7 @@
     (provider-fn)
     provider-fn))
 
-(defn- cmd-gphoto-api-token
+(defn cmd-gphoto-api-token
   "Return an API token for the currently authenticated Google Photo account."
 
   []
@@ -161,7 +161,7 @@
                                    :auth gphoto-auth
                                    :as-binary-stream true)})
 
-(defn- cmd-gphoto-list-albums
+(defn cmd-gphoto-list-albums
   "List available Google Photo Albums"
 
   []
@@ -169,7 +169,7 @@
     (table [[:title 50] :mediaItemsCount [:id 80]]
            (get-gphoto-albums gphoto-auth))))
 
-(defn- cmd-gphoto-list-media-items
+(defn cmd-gphoto-list-media-items
   "List available Google Photo media items."
 
   []
@@ -197,7 +197,7 @@
                      :creation_time (java.time.Instant/parse (get-in media-item [:mediaMetadata :creationTime]))
                      :media_metadata (pr-str (:mediaMetadata media-item))}))))
 
-(defn- cmd-gphoto-snapshot-update
+(defn cmd-gphoto-snapshot-update
   "Update the current gphoto snapshot."
 
   [ ]
@@ -213,7 +213,7 @@
                    "  FROM gphoto_media_item"
                    " ORDER BY creation_time")]))
 
-(defn- cmd-gphoto-snapshot-list
+(defn cmd-gphoto-snapshot-list
   "List the current gphoto snapshot."
 
   [ ]
@@ -280,7 +280,7 @@
     (doseq [ media-item media-items ]
       (backup-media-item gphoto-auth media-item))))
 
-(defn- cmd-gphoto-snapshot-backup
+(defn cmd-gphoto-snapshot-backup
   "Backup the current gphoto snapshot to a local filesystem directory."
 
   [ base-path ]
@@ -297,7 +297,7 @@
       (with-retries
         (backup-batch gphoto-auth media-items)))))
 
-(defn- cmd-gphoto-catalog
+(defn cmd-gphoto-catalog
   "Catalog the contents of the gphoto album."
 
   [ catalog-name ]

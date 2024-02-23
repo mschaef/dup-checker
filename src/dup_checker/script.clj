@@ -17,5 +17,6 @@
   [ & file-name ]
 
   (doseq [ f file-name ]
-    (log/report f)
-    (load-file f)))
+    (log/report "Running Script:" f)
+    (binding [ *ns* (find-ns 'dup-checker.script)]
+      (load-file f))))

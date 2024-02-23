@@ -6,7 +6,7 @@
             [taoensso.timbre :as log]
             [dup-checker.catalog :as catalog]))
 
-(defn- cmd-describe-duplicates
+(defn cmd-describe-duplicates
   "List all duplicate files by MD5 digest."
   [ ]
 
@@ -41,7 +41,7 @@
   (println))
 
 
-(defn- cmd-describe-digest
+(defn cmd-describe-digest
   "List every instance of a file with the given MD5 digests."
   [ & md5-digests ]
   (doseq [ md5-digest md5-digests ]
@@ -64,7 +64,7 @@
                filename-segment]))
   (println))
 
-(defn- cmd-describe-filename
+(defn cmd-describe-filename
   "List every instance of a file with any of the given text strings in its filename."
 
   [ & filename-segments ]

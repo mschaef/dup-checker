@@ -57,7 +57,7 @@
       (link-store-file [ this filename source ]
         (fail "Cannot create filesystem link in S3:" filename)))))
 
-(defn- cmd-s3-list-bucket
+(defn cmd-s3-list-bucket
   "List the contents of an s3 bucket."
   [ bucket-name ]
   (doseq [ bucket (s3-list-bucket-paged (s3-client) bucket-name)]

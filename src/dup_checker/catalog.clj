@@ -168,7 +168,7 @@
                    " GROUP BY catalog.catalog_id, catalog.name, catalog.updated_on, catalog_type, catalog.root_path"
                    " ORDER BY catalog.name")]))
 
-(defn- cmd-catalog-list
+(defn cmd-catalog-list
   "List all catalogs"
   [ ]
   (table
@@ -180,7 +180,7 @@
   (or (get-catalog-id catalog-name)
       (fail "No known catalog: " catalog-name)))
 
-(defn- cmd-catalog-file-duplicates
+(defn cmd-catalog-file-duplicates
   "List all duplicate files in a catalog by MD5 digest."
   [ catalog-name ]
 
@@ -200,7 +200,7 @@
                            " ORDER BY count")
                       catalog-id])))))
 
-(defn- cmd-catalog-file-list
+(defn cmd-catalog-file-list
   "List all files present in a catalog."
 
   ([ catalog-name file-pattern ]
@@ -212,7 +212,7 @@
   ([ catalog-name ]
    (cmd-catalog-file-list catalog-name nil)))
 
-(defn- cmd-catalog-remove
+(defn cmd-catalog-remove
   "Remove a catalog."
   [ catalog-name ]
 
@@ -220,7 +220,7 @@
     (jdbc/delete! (sfm/db) :file [ "catalog_id=?" catalog-id])
     (jdbc/delete! (sfm/db) :catalog [ "catalog_id=?" catalog-id])))
 
-(defn- cmd-catalog-set-root
+(defn cmd-catalog-set-root
   "Set the catalog root. (Useful if the cataloged files have been moved.)"
   [ catalog-name catalog-root ]
 
@@ -230,7 +230,7 @@
                     {:root_path catalog-root}
                     ["catalog_id=?" catalog-id])))
 
-(defn- cmd-catalog-export
+(defn cmd-catalog-export
   "Export a catalog to an EDN file."
 
   [ catalog-name filename ]
@@ -245,7 +245,7 @@
                              catalog-id])
       :items (get-all-catalog-files catalog-id)})))
 
-(defn- cmd-catalog-import
+(defn cmd-catalog-import
   "Import a catalog previously exported to an EDN file."
   [ catalog-name filename ]
 
@@ -269,7 +269,7 @@
                   [(:md5_digest value) value])
                 (get-all-catalog-files (get-required-catalog-id catalog-name)))))
 
-(defn- cmd-catalog-link
+(defn cmd-catalog-link
   "Extend the catalog with missing files from another catalog via links."
 
   [ catalog-name other-catalog-name ]
@@ -298,7 +298,7 @@
         (log/warn "Missing file in other storage: " (:name other-file))))))
 
 
-(defn- cmd-catalog-file-missing
+(defn cmd-catalog-file-missing
   "Identify files missing in a given catalog."
 
   [ catalog-name required-catalog-name ]
@@ -310,21 +310,21 @@
              (get-all-catalog-files
               (get-required-catalog-id required-catalog-name))))))
 
-(defn- cmd-catalog-create
+(defn cmd-catalog-create
   "Create a catalog rooted at a given URI."
 
   [ catalog-name store-uri ]
   (let [uri (java.net.URI. store-uri)]
     (catalog-files (ensure-catalog catalog-name uri) (store/get-store uri))))
 
-(defn- cmd-catalog-update
+(defn cmd-catalog-update
   "Create a catalog rooted at a given URI."
 
   [ catalog-name ]
   (let [catalog-id (get-required-catalog-id catalog-name)]
     (catalog-files catalog-id (get-catalog-store catalog-id))))
 
-(defn- cmd-catalog-exclude-extension
+(defn cmd-catalog-exclude-extension
   "Exclude files from a catalog by their extension."
 
   [ catalog-name & extensions ]
@@ -335,7 +335,7 @@
                     {:excluded true}
                     ["catalog_id=? AND extension=?" catalog-id ext]))))
 
-(defn- cmd-catalog-excluded-list
+(defn cmd-catalog-excluded-list
   "List excluded files in a catalog."
 
   [ catalog-name ]
@@ -344,7 +344,7 @@
    [:md5_digest :size :name]
    (get-excluded-catalog-files (get-required-catalog-id catalog-name))))
 
-(defn- cmd-catalog-exclude-pattern
+(defn cmd-catalog-exclude-pattern
   "Exclude files from a catalog that match a specific fileame pattern."
 
   [ catalog-name file-pattern]
@@ -354,7 +354,7 @@
                   {:excluded true}
                   ["catalog_id=? AND name LIKE ?" catalog-id file-pattern])))
 
-(defn- cmd-catalog-exclude-catalog
+(defn cmd-catalog-exclude-catalog
   "Exclude files from a catalog that are already in another catalog."
 
   [ catalog-name & other-catalog-names ]
@@ -372,7 +372,7 @@
                       catalog-id
                       other-catalog-id]))))
 
-(defn- cmd-catalog-exclude-reset
+(defn cmd-catalog-exclude-reset
   "Reset all catalog file exclusions."
 
   [ & catalog-names ]
