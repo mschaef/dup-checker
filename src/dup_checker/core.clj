@@ -15,12 +15,23 @@
             [dup-checker.s3 :as s3]
             [dup-checker.db :as db]))
 
+
+(defn- cmd-run-script
+  "Run a script or scripts."
+
+  [ & file-name ]
+
+  (doseq [ f file-name ]
+    (log/report f)
+    (load-file f)))
+
 (def subcommands
   {"catalog" catalog/subcommands
    "db" db/subcommands
    "describe" describe/subcommands
    "gphoto" gphoto/subcommands
-   "s3" s3/subcommands})
+   "s3" s3/subcommands
+   "run-script" cmd-run-script})
 
 (defn- display-help [ cmd-map ]
   (println "\n\nCommand Paths:\n")
