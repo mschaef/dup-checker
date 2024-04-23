@@ -8,10 +8,11 @@
   (catalog/cmd-catalog-exclude-extension catalog "ithmb" "pdf" "dvi" "tsp" "xcf" "xbm" "xpm" "moi" "mom" "mp3" "gif")
 
   ;; Remove an icon library, website statistics graphics, and an oracle documentation set.
-
   (catalog/cmd-catalog-exclude-pattern catalog
                                        "%iconic%" "%Iconic%" "%oracle%" "%_usage%" "%JDK%"
-                                       "%links-to-media-pc%" "%ectworks%"))
+                                       "%links-to-media-pc%" "%ectworks%" "%ksm%"
+                                       "%iTunes Media%" "%Music%" "%YMCA%" "%np_gym%"
+                                       "%utbs%" "%.thumbnails%"))
 
 
 (doseq [ catalog (remove #(= "pictures" %) (catalog/all-catalogs))]
