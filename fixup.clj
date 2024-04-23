@@ -5,10 +5,10 @@
 
 (doseq [ catalog (catalog/all-catalogs)]
   (log/info "Excluding from:" catalog)
-  (catalog/cmd-catalog-exclude-extension catalog "ithmb" "pdf" "dvi" "tsp" "xcf" "xbm" "xpm" "moi" "mom")
+  (catalog/cmd-catalog-exclude-extension catalog "ithmb" "pdf" "dvi" "tsp" "xcf" "xbm" "xpm" "moi" "mom" "gif")
 
   ;; Remove an icon library, website statistics graphics, and an oracle documentation set.
-  (catalog/cmd-catalog-exclude-pattern catalog "%iconic%" "%Iconic%" "%oracle%" "%_usage%"))
+  (catalog/cmd-catalog-exclude-pattern catalog "%iconic%" "%Iconic%" "%oracle%" "%_usage%" "%ectworks%"))
 
 (doseq [ catalog (remove #(= "pictures" %) (catalog/all-catalogs))]
   (log/info "Excluding files already in Lightroom:" catalog)
