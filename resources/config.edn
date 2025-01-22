@@ -4,4 +4,12 @@
 
  :log-levels
   [[#{"hsqldb.*" "com.zaxxer.hikari.*"} :warn]
-   [#{"dup-checker.*"} :info]]}
+   [#{"dup-checker.*"} :info]]
+
+ :image-extensions
+ #{"vob" "m4p" "wmv" "xbm" "lrcat" "pcx"
+    "dng" "fig" "psd" "jpeg" "hdr" "mpeg" "mpg" "xmp"
+    "wma" "xpm" "moi" "mom" "sbr" "mov" "dvi" "tga"
+    "svg" "tsp" "mod" "avi" "mp4" "xcf" "tif" "bmp"
+    "mp3" "pdf" "arw" "ithmb" "gif" "nef" "png" "jpg"
+    "mts" "heic"}}

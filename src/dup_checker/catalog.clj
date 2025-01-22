@@ -3,7 +3,8 @@
         sql-file.sql-util
         dup-checker.util
         playbook.config)
-  (:require [clojure.pprint :as pprint]
+  (:require [playbook.config :as config]
+            [clojure.pprint :as pprint]
             [taoensso.timbre :as log]
             [clj-commons.digest :as digest]
             [clojure.java.jdbc :as jdbc]
@@ -125,14 +126,6 @@
 (defn- get-catalog-file-names [ catalog-id ]
   (set (map :name (get-all-catalog-files catalog-id))))
 
-(def image-extensions
-  #{"vob" "m4p" "wmv" "xbm" "lrcat" "pcx"
-    "dng" "fig" "psd" "jpeg" "hdr" "mpeg" "mpg" "xmp"
-    "wma" "xpm" "moi" "mom" "sbr" "mov" "dvi" "tga"
-    "svg" "tsp" "mod" "avi" "mp4" "xcf" "tif" "bmp"
-    "mp3" "pdf" "arw" "ithmb" "gif" "nef" "png" "jpg"
-    "mts" "heic"})
-
 (defn- file-md5-digest [ file-info ]
   (with-retries
     (with-open [ r ((:data-stream-fn file-info)) ]
@@ -143,7 +136,8 @@
     (catalog-files (:name file-info))
     (log/info "File already cataloged:" (:name file-info))
 
-    (not (image-extensions (.toLowerCase (:extension file-info))))
+    (not ((config/cval :image-extensions)
+          (.toLowerCase (:extension file-info))))
     (log/info "Skipping non-image file:" (:name file-info))
 
     :else
