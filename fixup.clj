@@ -27,7 +27,7 @@
   (log/info "Excluding files already in crib-snapshots:" catalog)
   (catalog/cmd-catalog-exclude-catalog catalog "crib-snapshots"))
 
-;; Using d-old-external as a baseline for a complete set of missing files.
-(doseq [ catalog (remove #(= "d-old-external" %) (catalog/all-catalogs))]
-  (log/info "Excluding files already in d-old-external:" catalog)
-  (catalog/cmd-catalog-exclude-catalog catalog "d-old-external"))
+;; Using old-external as a baseline for a complete set of missing files.
+(doseq [ catalog (remove #(= "old-external" %) (catalog/all-catalogs))]
+  (log/info "Excluding files already in old-external:" catalog)
+  (catalog/cmd-catalog-exclude-catalog catalog "old-external"))
