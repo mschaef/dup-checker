@@ -217,11 +217,12 @@
 
 (defn cmd-catalog-remove
   "Remove a catalog."
-  [ catalog-name ]
+  [ & catalog-names ]
 
-  (let [catalog-id (get-required-catalog-id catalog-name)]
-    (jdbc/delete! (sfm/db) :file [ "catalog_id=?" catalog-id])
-    (jdbc/delete! (sfm/db) :catalog [ "catalog_id=?" catalog-id])))
+  (let [catalog-ids (map get-required-catalog-id catalog-names)]
+    (doseq [ catalog-id catalog-ids ]
+      (jdbc/delete! (sfm/db) :file [ "catalog_id=?" catalog-id])
+      (jdbc/delete! (sfm/db) :catalog [ "catalog_id=?" catalog-id]))))
 
 (defn cmd-catalog-set-root
   "Set the catalog root. (Useful if the cataloged files have been moved.)"
@@ -324,11 +325,13 @@
     (catalog-files (ensure-catalog catalog-name uri) (store/get-store uri))))
 
 (defn cmd-catalog-update
-  "Create a catalog rooted at a given URI."
+  "Update the named catalog or catalogs"
 
-  [ catalog-name ]
-  (let [catalog-id (get-required-catalog-id catalog-name)]
-    (catalog-files catalog-id (get-catalog-store catalog-id))))
+  [ & catalog-names ]
+
+  (let [catalog-ids (map get-required-catalog-id catalog-names)]
+    (doseq [ catalog-id catalog-ids ]
+      (catalog-files catalog-id (get-catalog-store catalog-id)))))
 
 (defn cmd-catalog-exclude-extension
   "Exclude files from a catalog by their extension."
