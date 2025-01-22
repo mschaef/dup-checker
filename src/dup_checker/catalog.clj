@@ -26,6 +26,12 @@
                                  "  WHERE catalog_id=? AND NOT excluded")
                             catalog-id]))))
 
+(defn query-all-catalog-ids []
+  (map :catalog_id
+       (query-all (sfm/db)
+                  [(str "SELECT catalog_id FROM catalog")])))
+
+
 (defn- get-catalog-id [ catalog-name ]
   (query-scalar (sfm/db)
                 [(str "SELECT catalog_id"
@@ -390,6 +396,16 @@
                     {:excluded false}
                     ["catalog_id=?" catalog-id]))))
 
+(defn cmd-catalog-exclude-reset-all
+  "Reset all catalog file exclusions in every catalog."
+
+  [ ]
+  (doseq [ catalog-id (query-all-catalog-ids)]
+    (jdbc/update! (sfm/db)
+                  :file
+                  {:excluded false}
+                  ["catalog_id=?" catalog-id])))
+
 
 (def file-subcommands
   #^{:doc "Commands for operating on files within catalogs."}
@@ -403,7 +419,8 @@
    "extension" #'cmd-catalog-exclude-extension
    "ls" #'cmd-catalog-excluded-list
    "pattern" #'cmd-catalog-exclude-pattern
-   "reset" #'cmd-catalog-exclude-reset})
+   "reset" #'cmd-catalog-exclude-reset
+   "reset-all" #'cmd-catalog-exclude-reset-all})
 
 (def subcommands
   #^{:doc "Catalog subcommands"}
