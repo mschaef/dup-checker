@@ -1,9 +1,8 @@
-(ns dup-checker.gphoto
+(ns dup-checker.google-oauth
   (:use playbook.core
         sql-file.sql-util
         dup-checker.util)
-  (:require [clojure.pprint :as pprint]
-            [taoensso.timbre :as log]
+  (:require [taoensso.timbre :as log]
             [clojure.java.browse :as browse]
             [ring.adapter.jetty :as jetty]
             [ring.middleware.params :as params]
@@ -11,8 +10,7 @@
             [clojure.core.async :as async]
             [sql-file.middleware :as sfm]
             [clojure.java.jdbc :as jdbc]
-            [dup-checker.http :as http]
-            [dup-checker.catalog :as catalog]))
+            [dup-checker.http :as http]))
 
 (def token-expiry-margin-sec 300)
 
@@ -34,7 +32,7 @@
       (add-shutdown-hook #(.stop server))
       server)))
 
-(defn- gphoto-authenticate [ oauth ]
+(defn- google-authenticate [ oauth ]
   (let [c (async/chan)
         server (start-site #(let [ params (:params %) ]
                               (async/>!! c (or (params "code") false))
@@ -46,7 +44,7 @@
       (.stop server)
       resp)))
 
-(defn- gphoto-exchange-code-for-jwt [ oauth code ]
+(defn- google-exchange-code-for-jwt [ oauth code ]
   (http/post-json
    (format "%s?client_id=%s&client_secret=%s&redirect_uri=%s&code=%s&grant_type=%s"
            "https://oauth2.googleapis.com/token"
@@ -69,28 +67,11 @@
                        "  WHEN NOT MATCHED THEN INSERT (refresh_token) VALUES (new_jwt.refresh_token) ")
                   (:refresh_token jwt)]))
 
-(defn cmd-gphoto-logout
-  "Log out from any currently authenticated Google Photo account."
-
-  []
-  (jdbc/delete! (sfm/db) :google_jwt []))
-
-(defn- gphoto-oauth-config []
+(defn- google-oauth-config []
   (:installed (try-parse-json (slurp "google-oauth.json"))))
 
-(defn cmd-gphoto-login
-  "Login to a Google Photo account."
 
-  []
-  (let [oauth (gphoto-oauth-config)]
-    (or (load-google-refresh-token)
-        (if-let [ authorization-code (gphoto-authenticate oauth) ]
-          (if-let [ jwt (gphoto-exchange-code-for-jwt oauth authorization-code) ]
-            (store-google-token jwt)
-            (fail "Cannot acquire Google JWT from authorization code."))
-          (fail "Google authentication failed")))))
-
-(defn- gphoto-request-access-token [ oauth refresh-token ]
+(defn- google-request-access-token [ oauth refresh-token ]
   (log/info "Requesting access token")
   (http/post-json
    (format "%s?client_id=%s&client_secret=%s&refresh_token=%s&grant_type=refresh_token"
@@ -99,66 +80,37 @@
            (:client_secret oauth)
            refresh-token)))
 
-(defn- gphoto-ensure-creds []
-  (let [oauth (gphoto-oauth-config)]
+(defn google-ensure-creds []
+  (let [oauth (google-oauth-config)]
     (assoc oauth :refresh-token (or (load-google-refresh-token)
                                     (fail "Not authenticated to Google")))))
 
-(defn- gphoto-ensure-access-token [ creds ]
+(defn google-ensure-access-token [ creds ]
   (if (or (not (:expires-on creds))
           (.isAfter
            (.plusSeconds (java.time.LocalDateTime/now) token-expiry-margin-sec)
            (:expires-on creds)))
-    (let [access-token (gphoto-request-access-token creds (:refresh-token creds))]
+    (let [access-token (google-request-access-token creds (:refresh-token creds))]
       (log/info "Access token acquired successfully")
       (-> creds
           (merge access-token)
           (assoc :expires-on (.plusSeconds (java.time.LocalDateTime/now) (:expires_in access-token)))))
     creds))
 
-(defn- gphoto-auth-provider [ ]
-  (let [ provider-fn (let [ gphoto-creds (atom (gphoto-ensure-creds)) ]
+(defn google-auth-provider [ ]
+  (let [ provider-fn (let [ google-creds (atom (google-ensure-creds)) ]
                        (fn []
-                         (swap! gphoto-creds gphoto-ensure-access-token)
-                         (:access_token @gphoto-creds)))]
+                         (swap! google-creds google-ensure-access-token)
+                         (:access_token @google-creds)))]
     (provider-fn)
     provider-fn))
 
-(defn cmd-gphoto-api-token
-  "Return an API token for the currently authenticated Google Photo account."
+(defn google-login []
+  (let [oauth (google-oauth-config)]
+    (or (load-google-refresh-token)
+        (if-let [ authorization-code (google-authenticate oauth) ]
+          (if-let [ jwt (google-exchange-code-for-jwt oauth authorization-code) ]
+            (store-google-token jwt)
+            (fail "Cannot acquire Google JWT from authorization code."))
+          (fail "Google authentication failed")))))
 
-  []
-  (pprint/pprint (gphoto-ensure-access-token (gphoto-ensure-creds))))
-
-
-(defn- get-gphoto-paged-stream [ gphoto-auth url items-key page-size ]
-  (letfn [(query-page [ page-token ]
-            (let [ response (with-retries
-                              (http/get-json (str url
-                                                  (str "?pageSize=" page-size)
-                                                  (when page-token
-                                                    (str "&pageToken=" page-token)))
-                                             :auth gphoto-auth))]
-              (if-let [ next-page-token (:nextPageToken response)]
-                (lazy-seq (concat (items-key response)
-                                  (query-page next-page-token)))
-                (items-key response))))]
-    (query-page nil)))
-
-(defn- get-gphoto-files [ gphoto-auth ]
-  (get-gphoto-paged-stream gphoto-auth "https://www.googleapis.com/drive/v3/files" :files 100))
-
-(defn cmd-gphoto-list-files
-  "List available Google Photo media items."
-
-  []
-  (let [ gphoto-auth (gphoto-auth-provider) ]
-    (doseq [ item (get-gphoto-files gphoto-auth) ]
-      (pprint/pprint item))))
-
-(def subcommands
-  #^{:doc "Commands for interacting with a Google Photo album."}
-  {"login" #'cmd-gphoto-login
-   "logout" #'cmd-gphoto-logout
-   "api-token" #'cmd-gphoto-api-token
-   "ls" #'cmd-gphoto-list-files})

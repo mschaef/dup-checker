@@ -11,7 +11,7 @@
             [dup-checker.catalog :as catalog]
             [dup-checker.describe :as describe]
             [dup-checker.fs :as fs]
-            [dup-checker.gphoto :as gphoto]
+            [dup-checker.gdrive :as gdrive]
             [dup-checker.s3 :as s3]
             [dup-checker.db :as db]
             [dup-checker.script :as script]))
@@ -20,7 +20,7 @@
   {"catalog" catalog/subcommands
    "db" db/subcommands
    "describe" describe/subcommands
-   "gphoto" gphoto/subcommands
+   "gdrive" gdrive/subcommands
    "s3" s3/subcommands
    "run-script" script/cmd-run-script})
 

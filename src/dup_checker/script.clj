@@ -7,7 +7,7 @@
             [dup-checker.catalog :as catalog]
             [dup-checker.describe :as describe]
             [dup-checker.fs :as fs]
-            [dup-checker.gphoto :as gphoto]
+            [dup-checker.gdrive :as gdrive]
             [dup-checker.s3 :as s3]
             [dup-checker.db :as db]))
 
