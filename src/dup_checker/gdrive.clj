@@ -16,19 +16,19 @@
   "Login to a Google account."
 
   []
-  (google-oauth/google-login))
+  (google-oauth/google-login "https://www.googleapis.com/auth/drive"))
 
 (defn cmd-gdrive-logout
-  "Log out from any currently authenticated Google Photo account."
+  "Log out from any currently authenticated Google account."
 
   []
   (jdbc/delete! (sfm/db) :google_jwt []))
 
 (defn cmd-gdrive-api-token
-  "Return an API token for the currently authenticated Google Photo account."
+  "Return an API token for the currently authenticated Google account."
 
   []
-  (pprint/pprint (google-oauth/google-ensure-access-token (google-oauth/google-ensure-creds))))
+  (pprint/pprint ((google-oauth/google-auth-provider))))
 
 
 (defn- get-gdrive-paged-stream [ gdrive-auth url items-key page-size ]
@@ -49,15 +49,18 @@
   (get-gdrive-paged-stream gdrive-auth "https://www.googleapis.com/drive/v3/files" :files 100))
 
 (defn cmd-gdrive-list-files
-  "List available Google Photo media items."
+  "List available Google Drive files."
 
   []
-  (let [ gdrive-auth (google-oauth/google-auth-provider) ]
-    (doseq [ item (get-gdrive-files gdrive-auth) ]
-      (pprint/pprint item))))
+  (let [gdrive-auth (google-oauth/google-auth-provider)
+        files (get-gdrive-files gdrive-auth)]
+    (table [[:kind 15]
+            [:mimeType 40]
+            :name]
+           files)))
 
 (def subcommands
-  #^{:doc "Commands for interacting with a Google Photo album."}
+  #^{:doc "Commands for interacting with a Google Drive."}
   {"login" #'cmd-gdrive-login
    "logout" #'cmd-gdrive-logout
    "api-token" #'cmd-gdrive-api-token

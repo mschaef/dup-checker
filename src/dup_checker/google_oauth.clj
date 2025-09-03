@@ -12,16 +12,19 @@
             [clojure.java.jdbc :as jdbc]
             [dup-checker.http :as http]))
 
+(defn- google-oauth-config []
+  (:installed (try-parse-json (slurp "google-oauth.json"))))
+
 (def token-expiry-margin-sec 300)
 
-(defn- request-google-authorization [ oauth ]
+(defn- request-google-authorization [ oauth scope ]
   (browse/browse-url
    (format "%s?client_id=%s&redirect_uri=%s&response_type=%s&scope=%s"
            (:auth_uri oauth)
            (:client_id oauth)
            "http://localhost:8080"
            "code"
-           "https://www.googleapis.com/auth/drive.readonly")))
+           scope)))
 
 (defn- start-site [ handler ]
   (let [ http-port 8080 ]
@@ -32,16 +35,18 @@
       (add-shutdown-hook #(.stop server))
       server)))
 
-(defn- google-authenticate [ oauth ]
+(defn- google-authenticate [ oauth scope ]
   (let [c (async/chan)
         server (start-site #(let [ params (:params %) ]
                               (async/>!! c (or (params "code") false))
                               (if-let [ error (params "error") ]
                                 (ring/response (str "Error: " error))
                                 (ring/response "OK"))))]
-    (request-google-authorization oauth)
+    (request-google-authorization oauth scope)
     (let [ resp (async/<!! c)]
-      (.stop server)
+      (async/thread
+        (Thread/sleep 1000)
+        (.stop server))
       resp)))
 
 (defn- google-exchange-code-for-jwt [ oauth code ]
@@ -67,10 +72,6 @@
                        "  WHEN NOT MATCHED THEN INSERT (refresh_token) VALUES (new_jwt.refresh_token) ")
                   (:refresh_token jwt)]))
 
-(defn- google-oauth-config []
-  (:installed (try-parse-json (slurp "google-oauth.json"))))
-
-
 (defn- google-request-access-token [ oauth refresh-token ]
   (log/info "Requesting access token")
   (http/post-json
@@ -80,12 +81,12 @@
            (:client_secret oauth)
            refresh-token)))
 
-(defn google-ensure-creds []
+(defn- google-ensure-creds []
   (let [oauth (google-oauth-config)]
     (assoc oauth :refresh-token (or (load-google-refresh-token)
                                     (fail "Not authenticated to Google")))))
 
-(defn google-ensure-access-token [ creds ]
+(defn- google-ensure-access-token [ creds ]
   (if (or (not (:expires-on creds))
           (.isAfter
            (.plusSeconds (java.time.LocalDateTime/now) token-expiry-margin-sec)
@@ -105,10 +106,10 @@
     (provider-fn)
     provider-fn))
 
-(defn google-login []
+(defn google-login [scope]
   (let [oauth (google-oauth-config)]
     (or (load-google-refresh-token)
-        (if-let [ authorization-code (google-authenticate oauth) ]
+        (if-let [ authorization-code (google-authenticate oauth scope) ]
           (if-let [ jwt (google-exchange-code-for-jwt oauth authorization-code) ]
             (store-google-token jwt)
             (fail "Cannot acquire Google JWT from authorization code."))
