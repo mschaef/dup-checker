@@ -59,9 +59,19 @@
             :name]
            files)))
 
+(defn cmd-gdrive-list-files-raw
+  "List available Google Drive files with all available information."
+
+  []
+  (let [gdrive-auth (google-oauth/google-auth-provider)
+        files (get-gdrive-files gdrive-auth)]
+    (doseq [f files]
+      (pprint/pprint f))))
+
 (def subcommands
   #^{:doc "Commands for interacting with a Google Drive."}
   {"login" #'cmd-gdrive-login
    "logout" #'cmd-gdrive-logout
    "api-token" #'cmd-gdrive-api-token
-   "ls" #'cmd-gdrive-list-files})
+   "ls" #'cmd-gdrive-list-files
+   "lsr" #'cmd-gdrive-list-files-raw})
