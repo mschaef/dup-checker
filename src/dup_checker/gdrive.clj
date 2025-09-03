@@ -16,7 +16,7 @@
   "Login to a Google account."
 
   []
-  (google-oauth/google-login "https://www.googleapis.com/auth/drive"))
+  (google-oauth/google-login ["https://www.googleapis.com/auth/drive"]))
 
 (defn cmd-gdrive-logout
   "Log out from any currently authenticated Google account."

@@ -17,6 +17,12 @@
 
 (def token-expiry-margin-sec 300)
 
+(defn- escape-scope [scope]
+  (if (vector? scope)
+    (java.net.URLEncoder/encode (clojure.string/join " " scope) "UTF-8")
+    scope))
+
+
 (defn- request-google-authorization [ oauth scope ]
   (browse/browse-url
    (format "%s?client_id=%s&redirect_uri=%s&response_type=%s&scope=%s"
@@ -24,7 +30,7 @@
            (:client_id oauth)
            "http://localhost:8080"
            "code"
-           scope)))
+           (escape-scope scope))))
 
 (defn- start-site [ handler ]
   (let [ http-port 8080 ]

@@ -6,10 +6,10 @@
 (defn- http-request-json* [ req-fn url & {:keys [ auth as-binary-stream ]} ]
   (let [bearer-token (if (fn? auth) (auth) auth)]
     (let [response (req-fn url
-                         (cond-> {}
-                           bearer-token (assoc :headers
-                                               {:Authorization (str "Bearer " bearer-token)})
-                           as-binary-stream (assoc :as :stream)))]
+                           (cond-> {}
+                             bearer-token (assoc :headers
+                                                 {:Authorization (str "Bearer " bearer-token)})
+                             as-binary-stream (assoc :as :stream)))]
       (and (= 200 (:status response))
            (if as-binary-stream
              (:body response)
