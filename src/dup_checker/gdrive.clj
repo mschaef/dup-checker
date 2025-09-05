@@ -31,22 +31,29 @@
   (pprint/pprint ((google-oauth/google-auth-provider))))
 
 
-(defn- get-gdrive-paged-stream [ gdrive-auth url items-key page-size ]
-  (letfn [(query-page [ page-token ]
-            (let [ response (with-retries
-                              (http/get-json (str url
-                                                  (str "?pageSize=" page-size)
-                                                  (when page-token
-                                                    (str "&pageToken=" page-token)))
-                                             :auth gdrive-auth))]
-              (if-let [ next-page-token (:nextPageToken response)]
-                (lazy-seq (concat (items-key response)
-                                  (query-page next-page-token)))
-                (items-key response))))]
-    (query-page nil)))
+(defn- get-gdrive-paged-stream
+  ([ gdrive-auth url items-key query-params ]
+   (letfn [(query-page [ page-token ]
+             (let [ response (with-retries
+                               (http/get-json (encode-url url (merge
+                                                               {:pageSize 100}
+                                                               query-params
+                                                               (if page-token
+                                                                 {:pageToken page-token}
+                                                                 {})))
+                                              :auth gdrive-auth))]
+               (if-let [ next-page-token (:nextPageToken response)]
+                 (lazy-seq (concat (items-key response)
+                                   (query-page next-page-token)))
+                 (items-key response))))]
+     (query-page nil)))
+
+  ([ gdrive-auth url items-key ]
+   (get-gdrive-paged-stream gdrive-auth url items-key {})))
 
 (defn- get-gdrive-files [ gdrive-auth ]
-  (get-gdrive-paged-stream gdrive-auth "https://www.googleapis.com/drive/v3/files" :files 100))
+  (get-gdrive-paged-stream gdrive-auth "https://www.googleapis.com/drive/v3/files" :files {:pageSize 1000
+                                                                                           :fields "nextPageToken,files/id,files/name,kind,files/mimeType,files/parents"}))
 
 (defn cmd-gdrive-list-files
   "List available Google Drive files."
@@ -56,7 +63,9 @@
         files (get-gdrive-files gdrive-auth)]
     (table [[:kind 15]
             [:mimeType 40]
-            :name]
+            [:id 35]
+            :name
+            :parents]
            files)))
 
 (defn cmd-gdrive-list-files-raw
