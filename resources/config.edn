@@ -2,6 +2,8 @@
  :db {:subname "dup-checker"
       :schemas [[ "dup-checker" 6 ]]}
 
+ :development-mode false
+
  :log-levels
   [[#{"hsqldb.*" "com.zaxxer.hikari.*"} :warn]
    [#{"dup-checker.*"} :info]]
