@@ -71,6 +71,14 @@
   (when-let [takeout-folder (first (query-gdrive-files gdrive-auth "name='Takeout' and mimeType='application/vnd.google-apps.folder'"))]
     (query-gdrive-files gdrive-auth (str "'" (:id takeout-folder) "' in parents"))))
 
+(defn- takeout-filename-timestamp [ filename ]
+  (and (.startsWith filename "takeout-")
+       (.substring filename 9 24)))
+
+(defn- get-gdrive-takeout-downloads [ gdrive-auth ]
+  (set (map takeout-filename-timestamp
+                        (map :name (get-gdrive-takeout-files gdrive-auth)))))
+
 (defn cmd-gdrive-list-files
   "List available Google Drive files."
 
@@ -96,6 +104,15 @@
             [:quotaBytesUsed 16]]
            (sort-by :name files))))
 
+(defn cmd-gdrive-list-takeout-downloads
+  "List available Google Drive files produced by Google Takeout."
+
+  []
+  (let [gdrive-auth (google-oauth/google-auth-provider)
+        downloads (get-gdrive-takeout-downloads gdrive-auth)]
+    (doseq [d downloads]
+      (println d))))
+
 (defn cmd-gdrive-list-files-raw
   "List available Google Drive files with all available information."
 
@@ -105,6 +122,21 @@
     (doseq [f files]
       (pprint/pprint f))))
 
+(defn- get-gdrive-takeout-files [ gdrive-auth ]
+  (when-let [takeout-folder (first (query-gdrive-files gdrive-auth "name='Takeout' and mimeType='application/vnd.google-apps.folder'"))]
+    (query-gdrive-files gdrive-auth (str "'" (:id takeout-folder) "' in parents"))))
+
+(defn cmd-gdrive-list-takeout-download-files
+  [download-name]
+
+  (let [gdrive-auth (google-oauth/google-auth-provider)
+        files (get-gdrive-takeout-files gdrive-auth)]
+    (table [[:mimeType 40]
+            [:id 35]
+            [:name 48]
+            [:quotaBytesUsed 16]]
+           (sort-by :name (filter #(.startsWith (:name %) (str "takeout-" download-name)) files)))))
+
 (def subcommands
   #^{:doc "Commands for interacting with a Google Drive."}
   {"login" #'cmd-gdrive-login
@@ -112,4 +144,6 @@
    "api-token" #'cmd-gdrive-api-token
    "ls" #'cmd-gdrive-list-files
    "lsr" #'cmd-gdrive-list-files-raw
-   "lst" #'cmd-gdrive-list-takeout-files})
+   "lst" #'cmd-gdrive-list-takeout-files
+   "lstd" #'cmd-gdrive-list-takeout-downloads
+   "lstdf" #'cmd-gdrive-list-takeout-download-files})
