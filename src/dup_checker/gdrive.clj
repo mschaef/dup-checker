@@ -51,9 +51,25 @@
   ([ gdrive-auth url items-key ]
    (get-gdrive-paged-stream gdrive-auth url items-key {})))
 
-(defn- get-gdrive-files [ gdrive-auth ]
-  (get-gdrive-paged-stream gdrive-auth "https://www.googleapis.com/drive/v3/files" :files {:pageSize 1000
-                                                                                           :fields "nextPageToken,files/id,files/name,kind,files/mimeType,files/parents"}))
+(defn- get-gdrive-files
+  ([ gdrive-auth ]
+   (get-gdrive-paged-stream gdrive-auth "https://www.googleapis.com/drive/v3/files"
+                            :files
+                            {:pageSize 1000
+                             :fields "nextPageToken,files/kind,files/id,files/name,kind,files/mimeType,files/parents,files/quotaBytesUsed"
+                             })))
+
+(defn- query-gdrive-files
+  ([ gdrive-auth query ]
+   (get-gdrive-paged-stream gdrive-auth "https://www.googleapis.com/drive/v3/files"
+                            :files
+                            {:pageSize 1000
+                             :q query
+                             :fields "nextPageToken,files/kind,files/id,files/name,kind,files/mimeType,files/parents,files/quotaBytesUsed"})))
+
+(defn- get-gdrive-takeout-files [ gdrive-auth ]
+  (when-let [takeout-folder (first (query-gdrive-files gdrive-auth "name='Takeout' and mimeType='application/vnd.google-apps.folder'"))]
+    (query-gdrive-files gdrive-auth (str "'" (:id takeout-folder) "' in parents"))))
 
 (defn cmd-gdrive-list-files
   "List available Google Drive files."
@@ -61,12 +77,24 @@
   []
   (let [gdrive-auth (google-oauth/google-auth-provider)
         files (get-gdrive-files gdrive-auth)]
-    (table [[:kind 15]
-            [:mimeType 40]
+    (table [[:mimeType 40]
             [:id 35]
-            :name
+            [:name 48]
+            [:quotaBytesUsed 16]
             :parents]
            files)))
+
+(defn cmd-gdrive-list-takeout-files
+  "List available Google Drive files produced by Google Takeout."
+
+  []
+  (let [gdrive-auth (google-oauth/google-auth-provider)
+        files (get-gdrive-takeout-files gdrive-auth)]
+    (table [[:mimeType 40]
+            [:id 35]
+            [:name 48]
+            [:quotaBytesUsed 16]]
+           (sort-by :name files))))
 
 (defn cmd-gdrive-list-files-raw
   "List available Google Drive files with all available information."
@@ -83,4 +111,5 @@
    "logout" #'cmd-gdrive-logout
    "api-token" #'cmd-gdrive-api-token
    "ls" #'cmd-gdrive-list-files
-   "lsr" #'cmd-gdrive-list-files-raw})
+   "lsr" #'cmd-gdrive-list-files-raw
+   "lst" #'cmd-gdrive-list-takeout-files})
