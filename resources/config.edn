@@ -14,4 +14,6 @@
     "wma" "xpm" "moi" "mom" "sbr" "mov" "dvi" "tga"
     "svg" "tsp" "mod" "avi" "mp4" "xcf" "tif" "bmp"
     "mp3" "pdf" "arw" "ithmb" "gif" "nef" "png" "jpg"
-    "mts" "heic"}}
+    "mts" "heic"}
+
+ :transfer-buffer-size 65536}

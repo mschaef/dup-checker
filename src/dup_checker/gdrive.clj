@@ -2,7 +2,8 @@
   (:use playbook.core
         sql-file.sql-util
         dup-checker.util)
-  (:require [clojure.pprint :as pprint]
+  (:require [playbook.config :as config]
+            [clojure.pprint :as pprint]
             [taoensso.timbre :as log]
             [sql-file.middleware :as sfm]
             [clojure.java.jdbc :as jdbc]
@@ -148,16 +149,16 @@
   [file-id output-filename]
 
   (let [gdrive-auth (google-oauth/google-auth-provider)
-        buf (byte-array 4096)]
+        buf (byte-array (config/cval :transfer-buffer-size))]
 
     (with-open [gdrive-stream (get-gdrive-stream gdrive-auth (str "https://www.googleapis.com/drive/v3/files/" file-id)
                                                  {:alt "media"})]
       (with-open [file-stream (clojure.java.io/output-stream output-filename)]
-        (loop [nbytes (.read gdrive-stream buf)]
-          (println nbytes)
-          (.write file-stream buf 0 nbytes)
-          (when (= nbytes 4096)
-            (recur (.read gdrive-stream buf))))))))
+        (loop [tot-bytes 0]
+          (let [bytes-read (.read gdrive-stream buf)]
+            (when (pos? bytes-read)
+              (.write file-stream buf 0 bytes-read)
+              (recur (+ tot-bytes bytes-read)))))))))
 
 (def subcommands
   #^{:doc "Commands for interacting with a Google Drive."}
