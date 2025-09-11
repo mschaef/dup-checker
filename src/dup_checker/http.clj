@@ -3,17 +3,24 @@
             [clj-http.client :as http]
             [playbook.core :as playbook]))
 
-(defn- http-request-json* [ req-fn url & {:keys [ auth as-binary-stream ]} ]
+(defn- http-request-json* [ req-fn url & {:keys [ auth ]} ]
   (let [bearer-token (if (fn? auth) (auth) auth)]
     (let [response (req-fn url
                            (cond-> {}
                              bearer-token (assoc :headers
-                                                 {:Authorization (str "Bearer " bearer-token)})
-                             as-binary-stream (assoc :as :stream)))]
+                                                 {:Authorization (str "Bearer " bearer-token)})))]
       (and (= 200 (:status response))
-           (if as-binary-stream
-             (:body response)
-             (playbook/try-parse-json (:body response)))))))
+           (playbook/try-parse-json (:body response))))))
 
 (def get-json (partial http-request-json* http/get))
 (def post-json (partial http-request-json* http/post))
+
+(defn get-binary-stream [ url & {:keys [ auth ]} ]
+  (let [bearer-token (if (fn? auth) (auth) auth)]
+    (let [response (http/get url
+                             (cond-> {:as :stream}
+                               bearer-token (assoc :headers
+                                                   {:Authorization (str "Bearer " bearer-token)})))]
+      (and (= 200 (:status response))
+           (:body response)))))
+
