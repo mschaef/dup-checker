@@ -78,9 +78,16 @@
                              :q query
                              :fields "nextPageToken,files/kind,files/id,files/name,kind,files/mimeType,files/parents,files/quotaBytesUsed"})))
 
-(defn- get-gdrive-takeout-files [ gdrive-auth ]
-  (when-let [takeout-folder (first (query-gdrive-files gdrive-auth "name='Takeout' and mimeType='application/vnd.google-apps.folder'"))]
-    (query-gdrive-files gdrive-auth (str "'" (:id takeout-folder) "' in parents"))))
+(defn- get-gdrive-takeout-files
+
+  ([ gdrive-auth ]
+   (when-let [takeout-folder (first (query-gdrive-files gdrive-auth "name='Takeout' and mimeType='application/vnd.google-apps.folder'"))]
+     (query-gdrive-files gdrive-auth (str "'" (:id takeout-folder) "' in parents"))))
+
+  ([ gdrive-auth takeout-name ]
+
+   (filter #(.startsWith (:name %) (str "takeout-" takeout-name))
+           (get-gdrive-takeout-files gdrive-auth))))
 
 (defn- takeout-filename-timestamp [ filename ]
   (and (.startsWith filename "takeout-")
@@ -132,25 +139,16 @@
     (doseq [f files]
       (pprint/pprint f))))
 
-(defn- get-gdrive-takeout-files [ gdrive-auth ]
-  (when-let [takeout-folder (first (query-gdrive-files gdrive-auth "name='Takeout' and mimeType='application/vnd.google-apps.folder'"))]
-    (query-gdrive-files gdrive-auth (str "'" (:id takeout-folder) "' in parents"))))
-
 (defn cmd-gdrive-list-takeout-download-files
   [download-name]
 
   (let [gdrive-auth (google-oauth/google-auth-provider)
-        files (get-gdrive-takeout-files gdrive-auth)]
-    (file-table (sort-by :name (filter #(.startsWith (:name %) (str "takeout-" download-name)) files)))))
+        files (get-gdrive-takeout-files gdrive-auth download-name)]
 
-(defn cmd-gdrive-get-file
-  "Get a Google Drive file by ID"
+    (file-table (sort-by :name files))))
 
-  [file-id output-filename]
-
-  (let [gdrive-auth (google-oauth/google-auth-provider)
-        buf (byte-array (config/cval :transfer-buffer-size))]
-
+(defn- download-gdrive-file-by-id [gdrive-auth file-id output-filename]
+  (let [buf (byte-array (config/cval :transfer-buffer-size))]
     (with-open [gdrive-stream (get-gdrive-stream gdrive-auth (str "https://www.googleapis.com/drive/v3/files/" file-id)
                                                  {:alt "media"})]
       (with-open [file-stream (clojure.java.io/output-stream output-filename)]
@@ -159,6 +157,30 @@
             (when (pos? bytes-read)
               (.write file-stream buf 0 bytes-read)
               (recur (+ tot-bytes bytes-read)))))))))
+
+(defn cmd-gdrive-get-file
+  "Get a Google Drive file by ID"
+
+  [file-id output-filename]
+  (let [gdrive-auth (google-oauth/google-auth-provider)]
+    (download-gdrive-file-by-id gdrive-auth file-id output-filename)))
+
+(defn cmd-gdrive-sync-takeout-download
+  "Sync a Google Takeout download to the current directory."
+
+  [download-name]
+
+  (let [gdrive-auth (google-oauth/google-auth-provider)
+        files (get-gdrive-takeout-files gdrive-auth download-name)]
+
+    (doseq [f (sort-by :name files)]
+      (let [filename (:name f)
+            file (java.io.File. filename)]
+        (when (not (and (.exists file)
+                        (= (.length file)
+                           (long (bigdec (:quotaBytesUsed f))))))
+          (log/info "Downloading: " f)
+          (download-gdrive-file-by-id gdrive-auth (:id f) filename))))))
 
 (def subcommands
   #^{:doc "Commands for interacting with a Google Drive."}
@@ -171,4 +193,4 @@
    "lstd" #'cmd-gdrive-list-takeout-downloads
    "lstdf" #'cmd-gdrive-list-takeout-download-files
    "get" #'cmd-gdrive-get-file
-   })
+   "synctd" #'cmd-gdrive-sync-takeout-download})
