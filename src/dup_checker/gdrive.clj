@@ -140,8 +140,9 @@
       (pprint/pprint f))))
 
 (defn cmd-gdrive-list-takeout-download-files
-  [download-name]
+  "List available files within a specific named Google Takeout Download."
 
+  [download-name]
   (let [gdrive-auth (google-oauth/google-auth-provider)
         files (get-gdrive-takeout-files gdrive-auth download-name)]
 
@@ -169,7 +170,6 @@
   "Sync a Google Takeout download to the current directory."
 
   [download-name]
-
   (let [gdrive-auth (google-oauth/google-auth-provider)
         files (get-gdrive-takeout-files gdrive-auth download-name)]
 
