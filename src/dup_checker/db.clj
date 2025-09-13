@@ -6,8 +6,7 @@
             [taoensso.timbre :as log]
             [clj-commons.digest :as digest]
             [sql-file.middleware :as sfm]
-            [sql-file.core :as sfc
-             ]))
+            [sql-file.core :as sfc]))
 
 (def date-format (java.text.SimpleDateFormat. "yyyyMMdd-hhmm"))
 
@@ -28,7 +27,15 @@
   []
   (sfc/start-sqltool-shell (sfm/db)))
 
+(defn cmd-db-defragment
+  "Defragment the database."
+
+  []
+  (sfc/checkpoint-defragment (sfm/db)))
+
+
 (def subcommands
   #^{:doc "Database administration commands"}
   {"backup" #'cmd-db-backup
-   "shell" #'cmd-db-shell})
+   "shell" #'cmd-db-shell
+   "defragment" #'cmd-db-defragment})
