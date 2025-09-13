@@ -148,11 +148,12 @@
 
     (file-table (sort-by :name files))))
 
-(defn- download-gdrive-file-by-id [gdrive-auth file-id output-filename]
+(defn- download-gdrive-file-by-id [gdrive-auth file-id output-file]
+  (log/info "Downloading: " file-id " to " (str output-file))
   (let [buf (byte-array (config/cval :transfer-buffer-size))]
     (with-open [gdrive-stream (get-gdrive-stream gdrive-auth (str "https://www.googleapis.com/drive/v3/files/" file-id)
                                                  {:alt "media"})]
-      (with-open [file-stream (clojure.java.io/output-stream output-filename)]
+      (with-open [file-stream (clojure.java.io/output-stream output-file)]
         (loop [tot-bytes 0]
           (let [bytes-read (.read gdrive-stream buf)]
             (when (pos? bytes-read)
@@ -164,23 +165,22 @@
 
   [file-id output-filename]
   (let [gdrive-auth (google-oauth/google-auth-provider)]
-    (download-gdrive-file-by-id gdrive-auth file-id output-filename)))
+    (download-gdrive-file-by-id gdrive-auth file-id (java.io.File. output-filename))))
 
 (defn cmd-gdrive-sync-takeout-download
   "Sync a Google Takeout download to the current directory."
 
-  [download-name]
+  [download-name target-path]
   (let [gdrive-auth (google-oauth/google-auth-provider)
         files (get-gdrive-takeout-files gdrive-auth download-name)]
 
     (doseq [f (sort-by :name files)]
-      (let [filename (:name f)
-            file (java.io.File. filename)]
-        (when (not (and (.exists file)
-                        (= (.length file)
-                           (long (bigdec (:quotaBytesUsed f))))))
-          (log/info "Downloading: " f)
-          (download-gdrive-file-by-id gdrive-auth (:id f) filename))))))
+      (let [file (java.io.File. (str target-path "/" (:name f)))]
+        (if (and (.exists file)
+                 (= (.length file)
+                    (long (bigdec (:quotaBytesUsed f)))))
+          (log/info "Skipping file already present locally: " (:id f))
+          (download-gdrive-file-by-id gdrive-auth (:id f) file))))))
 
 (def subcommands
   #^{:doc "Commands for interacting with a Google Drive."}
