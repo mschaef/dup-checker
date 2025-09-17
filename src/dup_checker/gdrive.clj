@@ -130,15 +130,6 @@
     (doseq [d downloads]
       (println d))))
 
-(defn cmd-gdrive-list-files-raw
-  "List available Google Drive files with all available information."
-
-  []
-  (let [gdrive-auth (google-oauth/google-auth-provider)
-        files (get-gdrive-files gdrive-auth)]
-    (doseq [f files]
-      (pprint/pprint f))))
-
 (defn cmd-gdrive-list-takeout-download-files
   "List available files within a specific named Google Takeout Download."
 
@@ -188,7 +179,6 @@
    "logout" #'cmd-gdrive-logout
    "api-token" #'cmd-gdrive-api-token
    "ls" #'cmd-gdrive-list-files
-   "lsr" #'cmd-gdrive-list-files-raw
    "lst" #'cmd-gdrive-list-takeout-files
    "lstd" #'cmd-gdrive-list-takeout-downloads
    "lstdf" #'cmd-gdrive-list-takeout-download-files

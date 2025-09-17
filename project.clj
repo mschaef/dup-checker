@@ -6,7 +6,8 @@
   :plugins [[lein-ancient "1.0.0-RC3"]]
 
   :dependencies [[org.clojure/clojure "1.12.2"]
-                 [cheshire "6.1.0"] 
+                 [org.clojure/tools.cli "1.1.230"]
+                 [cheshire "6.1.0"]
                  [listora/again "1.0.0"]
                  [org.clj-commons/digest "1.4.100"]
                  [software.amazon.awssdk/s3  "2.33.3"]

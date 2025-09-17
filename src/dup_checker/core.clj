@@ -17,6 +17,9 @@
             [dup-checker.cli :as cli]))
 
 (def subcommands
+  #^{:opts [[nil "--raw" "Raw table representation"
+             :id :raw
+             :default false]]}
   {"catalog" catalog/subcommands
    "db" db/subcommands
    "describe" describe/subcommands

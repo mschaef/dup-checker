@@ -1,5 +1,2 @@
-{ :db {:subname "./local-db/dup-checker"}
-
- :log-levels [[#{"org.apache.http.conn.*"
-                 "org.apache.http.impl.conn.*"} :debug]
-              [#{"*"} :warn]]}
+{:db {:subname "./local-db/dup-checker"}
+ :log-levels [[#{"*"} :warn]]}

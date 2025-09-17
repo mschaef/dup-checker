@@ -1,7 +1,8 @@
 (ns dup-checker.util
   (:require [clojure.pprint :as pprint]
             [taoensso.timbre :as log]
-            [again.core :as again]))
+            [again.core :as again]
+            [playbook.config :as config]))
 
 (defn fail [ message & args ]
   (let [ full-message (apply str message args)]
@@ -42,12 +43,15 @@
   (println (clojure.string/join " " (map #(colstr % row) ks))))
 
 (defn table [ ks rows ]
-  (let [ks (map normalize-colspec ks)]
-    (print-row ks (into {} (map (fn [ [ key _ ] ]
-                                  [ key key ]) ks)))
-    (doseq [ row rows ]
-      (print-row ks row))
-    (println "n=" (count rows))))
+  (if (config/cval :raw)
+    (doseq [r rows]
+      (pprint/pprint r))
+    (let [ks (map normalize-colspec ks)]
+      (print-row ks (into {} (map (fn [ [ key _ ] ]
+                                    [ key key ]) ks)))
+      (doseq [ row rows ]
+        (print-row ks row))
+      (println "n=" (count rows)))))
 
 (defn get-filename-extension [ name ]
   (let [sep-index (.lastIndexOf name ".")]
