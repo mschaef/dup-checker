@@ -72,6 +72,7 @@
     (describe-filename filename-segment)))
 
 (def subcommands
+  #^{:doc "Commands for describing the catalog in more detail"}
   {"digest" #'cmd-describe-digest
    "filename" #'cmd-describe-filename
    "duplicates" #'cmd-describe-duplicates})

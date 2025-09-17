@@ -7,14 +7,14 @@
             [sql-file.core :as sql-file]
             [sql-file.middleware :as sfm]
             [taoensso.timbre :as log]
-            [playbook.config :as config]
             [dup-checker.catalog :as catalog]
             [dup-checker.describe :as describe]
             [dup-checker.fs :as fs]
             [dup-checker.gdrive :as gdrive]
             [dup-checker.s3 :as s3]
             [dup-checker.db :as db]
-            [dup-checker.script :as script]))
+            [dup-checker.script :as script]
+            [dup-checker.cli :as cli]))
 
 (def subcommands
   {"catalog" catalog/subcommands
@@ -22,36 +22,7 @@
    "describe" describe/subcommands
    "gdrive" gdrive/subcommands
    "s3" s3/subcommands
-   "run-script" script/cmd-run-script})
-
-(defn- display-help [ cmd-map ]
-  (println "\n\nCommand Paths:\n")
-
-  (letfn [(display-subcommands [ cmd-map indent ]
-            (doseq [ cmd-name (sort (keys cmd-map)) ]
-              (let [cmd-fn (get cmd-map cmd-name)
-                    { doc :doc arglists :arglists } (meta cmd-fn) ]
-                (if (map? cmd-fn)
-                  (do
-                    (println (spaces (* indent 2)) cmd-name (if doc (str " - " doc) ""))
-                    (display-subcommands cmd-fn (+ indent 1))
-                    (println))
-                  (println (spaces (* indent 2)) cmd-name (first arglists) (if doc (str " - " doc) ""))))))]
-    (display-subcommands cmd-map 0)))
-
-(defn- dispatch-subcommand [ cmd-map args ]
-  (try
-    (if (= (count args) 0)
-      (fail "Insufficient arguments, missing subcommand.")
-      (let [[ subcommand & args ] args]
-        (if-let [ cmd-fn (get (assoc cmd-map "help" #(display-help cmd-map)) subcommand) ]
-          (if (map? cmd-fn)
-            (dispatch-subcommand cmd-fn args)
-            (with-exception-barrier :command-processing
-              (apply cmd-fn args)))
-          (fail "Unknown subcommand: " subcommand))))
-    (catch Exception e
-      (display-help cmd-map))))
+   "run-script" #'script/cmd-run-script})
 
 (defn- db-conn-spec [ ]
   ;; TODO: Much of this logic should somehow go in playbook
@@ -69,4 +40,4 @@
   (config/with-extended-config {:store-scheme store-schemes}
     (sql-file/with-pool [db-conn (db-conn-spec)]
       (sfm/with-db-connection db-conn
-        (dispatch-subcommand subcommands args)))))
+        (cli/dispatch-subcommand subcommands args)))))
