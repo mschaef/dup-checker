@@ -25,13 +25,6 @@
   []
   (jdbc/delete! (sfm/db) :google_jwt []))
 
-(defn cmd-gdrive-api-token
-  "Return an API token for the currently authenticated Google account."
-
-  []
-  (pprint/pprint ((google-oauth/google-auth-provider))))
-
-
 (defn- get-gdrive-paged-seq
   ([ gdrive-auth url items-key query-params ]
    (letfn [(query-page [ page-token ]
@@ -113,32 +106,6 @@
         files (get-gdrive-files gdrive-auth)]
     (file-table files)))
 
-(defn cmd-gdrive-list-takeout-files
-  "List available Google Drive files produced by Google Takeout."
-
-  []
-  (let [gdrive-auth (google-oauth/google-auth-provider)
-        files (get-gdrive-takeout-files gdrive-auth)]
-    (file-table files)))
-
-(defn cmd-gdrive-list-takeout-downloads
-  "List available Google Drive downloads produced by Google Takeout."
-
-  []
-  (let [gdrive-auth (google-oauth/google-auth-provider)
-        downloads (get-gdrive-takeout-downloads gdrive-auth)]
-    (doseq [d downloads]
-      (println d))))
-
-(defn cmd-gdrive-list-takeout-download-files
-  "List available files within a specific named Google Takeout Download."
-
-  [download-name]
-  (let [gdrive-auth (google-oauth/google-auth-provider)
-        files (get-gdrive-takeout-files gdrive-auth download-name)]
-
-    (file-table (sort-by :name files))))
-
 (defn- download-gdrive-file-by-id [gdrive-auth file-id output-file]
   (log/info "Downloading: " file-id " to " (str output-file))
   (with-retries
@@ -152,6 +119,13 @@
                 (.write file-stream buf 0 bytes-read)
                 (recur (+ tot-bytes bytes-read))))))))))
 
+
+(defn- trash-gdrive-file-by-id [gdrive-auth file-id]
+  (log/info "Moving: " file-id " to trash")
+  (with-retries
+    (http/post-json (str "https://www.googleapis.com/drive/v2/files/" file-id "/trash")
+                    :auth gdrive-auth)))
+
 (defn cmd-gdrive-get-file
   "Get a Google Drive file by ID"
 
@@ -159,8 +133,35 @@
   (let [gdrive-auth (google-oauth/google-auth-provider)]
     (download-gdrive-file-by-id gdrive-auth file-id (java.io.File. output-filename))))
 
-(defn cmd-gdrive-sync-takeout-download
-  "Sync a Google Takeout download to the current directory."
+(defn cmd-gdrive-trash-file
+  "Trash a Google Drive file by ID"
+
+  [file-id]
+  (let [gdrive-auth (google-oauth/google-auth-provider)]
+    (trash-gdrive-file-by-id gdrive-auth file-id)))
+
+;;; Google Takeout Support
+
+(defn cmd-gdrive-takeout-list-downloads
+  "List available Google Drive downloads produced by Google Takeout."
+
+  []
+  (let [gdrive-auth (google-oauth/google-auth-provider)
+        downloads (get-gdrive-takeout-downloads gdrive-auth)]
+    (doseq [d downloads]
+      (println d))))
+
+(defn cmd-gdrive-takeout-list-download-files
+  "List available files within a specific named Google Takeout Download."
+
+  [download-name]
+  (let [gdrive-auth (google-oauth/google-auth-provider)
+        files (get-gdrive-takeout-files gdrive-auth download-name)]
+
+    (file-table (sort-by :name files))))
+
+(defn cmd-gdrive-takeout-sync-download
+  "Sync a Google Takeout download to the target  directory."
 
   [download-name target-path]
   (let [gdrive-auth (google-oauth/google-auth-provider)
@@ -174,14 +175,20 @@
           (log/info "Skipping file already present locally: " (:id f))
           (download-gdrive-file-by-id gdrive-auth (:id f) file))))))
 
+;;; Subcommand Maps
+
+(def takeout-subcommands
+  #^{:doc "Commands for working with Google Takeout photo albums stored in Google Drive."}
+  {"ls" #'cmd-gdrive-takeout-list-downloads
+   "lsf" #'cmd-gdrive-takeout-list-download-files
+   "sync" #'cmd-gdrive-takeout-sync-download})
+
 (def subcommands
   #^{:doc "Commands for interacting with a Google Drive."}
   {"login" #'cmd-gdrive-login
    "logout" #'cmd-gdrive-logout
-   "api-token" #'cmd-gdrive-api-token
    "ls" #'cmd-gdrive-list-files
-   "lst" #'cmd-gdrive-list-takeout-files
-   "lstd" #'cmd-gdrive-list-takeout-downloads
-   "lstdf" #'cmd-gdrive-list-takeout-download-files
    "get" #'cmd-gdrive-get-file
-   "synctd" #'cmd-gdrive-sync-takeout-download})
+   "trash" #'cmd-gdrive-trash-file
+
+   "takeout" takeout-subcommands})
