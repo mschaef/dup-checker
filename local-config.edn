@@ -1,2 +1,2 @@
 {:db {:subname "./local-db/dup-checker"}
- :log-levels [[#{"*"} :warn]]}
+ :log-levels [[#{"*"} :info]]}

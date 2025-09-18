@@ -141,15 +141,16 @@
 
 (defn- download-gdrive-file-by-id [gdrive-auth file-id output-file]
   (log/info "Downloading: " file-id " to " (str output-file))
-  (let [buf (byte-array (config/cval :transfer-buffer-size))]
-    (with-open [gdrive-stream (get-gdrive-stream gdrive-auth (str "https://www.googleapis.com/drive/v3/files/" file-id)
-                                                 {:alt "media"})]
-      (with-open [file-stream (clojure.java.io/output-stream output-file)]
-        (loop [tot-bytes 0]
-          (let [bytes-read (.read gdrive-stream buf)]
-            (when (pos? bytes-read)
-              (.write file-stream buf 0 bytes-read)
-              (recur (+ tot-bytes bytes-read)))))))))
+  (with-retries
+    (let [buf (byte-array (config/cval :transfer-buffer-size))]
+      (with-open [gdrive-stream (get-gdrive-stream gdrive-auth (str "https://www.googleapis.com/drive/v3/files/" file-id)
+                                                   {:alt "media"})]
+        (with-open [file-stream (clojure.java.io/output-stream output-file)]
+          (loop [tot-bytes 0]
+            (let [bytes-read (.read gdrive-stream buf)]
+              (when (pos? bytes-read)
+                (.write file-stream buf 0 bytes-read)
+                (recur (+ tot-bytes bytes-read))))))))))
 
 (defn cmd-gdrive-get-file
   "Get a Google Drive file by ID"
