@@ -157,11 +157,19 @@
   [download-name]
   (let [gdrive-auth (google-oauth/google-auth-provider)
         files (get-gdrive-takeout-files gdrive-auth download-name)]
-
     (file-table (sort-by :name files))))
 
-(defn cmd-gdrive-takeout-sync-download
-  "Sync a Google Takeout download to the target  directory."
+(defn- local-file-matches? [local-file file-info]
+  (and (.exists local-file)
+       (= (.length local-file)
+          (long (bigdec (:quotaBytesUsed file-info))))))
+
+(defn
+  ^{:doc "Copy a Google Takeout download to the target directory."
+    :opts [[nil "--move" "Move files, trashing them in gdrive once a local copy has been made."
+            :id :move-files
+            :default false]]}
+  cmd-gdrive-takeout-copy-download
 
   [download-name target-path]
   (let [gdrive-auth (google-oauth/google-auth-provider)
@@ -170,14 +178,15 @@
     (doseq [f (sort-by :name files)]
       (if (:trashed f)
         (log/info "Skipping trashed file:" (:id f))
-        (with-retries
-          (let [file (java.io.File. (str target-path "/" (:name f)))]
-            (if (and (.exists file)
-                     (= (.length file)
-                        (long (bigdec (:quotaBytesUsed f)))))
-              (log/info "Skipping file already present locally:" (:id f))
-              (get-gdrive-file-by-id gdrive-auth (:id f) file)))
-          (trash-gdrive-file-by-id gdrive-auth (:id f)))))))
+        (let [local-file (java.io.File. (str target-path "/" (:name f)))]
+          (with-retries
+            (if (local-file-matches? local-file f)
+              (log/info "Skipping copy of file already present locally:" (:id f))
+              (get-gdrive-file-by-id gdrive-auth (:id f) local-file)))
+          (when (config/cval :move-files)
+            (if (local-file-matches? local-file f)
+              (trash-gdrive-file-by-id gdrive-auth (:id f))
+              (log/warn "Not moving file into trash, mismatch in local file size:" (:id f)))))))))
 
 ;;; Subcommand Maps
 
@@ -185,7 +194,7 @@
   #^{:doc "Commands for working with Google Takeout photo albums stored in Google Drive."}
   {"ls" #'cmd-gdrive-takeout-list-downloads
    "lsf" #'cmd-gdrive-takeout-list-download-files
-   "sync" #'cmd-gdrive-takeout-sync-download})
+   "copy" #'cmd-gdrive-takeout-copy-download})
 
 (def subcommands
   #^{:doc "Commands for interacting with a Google Drive."}
