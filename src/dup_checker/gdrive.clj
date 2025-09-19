@@ -69,7 +69,7 @@
                             :files
                             {:pageSize 1000
                              :q query
-                             :fields "nextPageToken,files/kind,files/id,files/name,kind,files/mimeType,files/parents,files/quotaBytesUsed"})))
+                             :fields "nextPageToken,files/kind,files/id,files/name,kind,files/mimeType,files/parents,files/quotaBytesUsed,files/trashed"})))
 
 (defn- get-gdrive-takeout-files
 
@@ -168,14 +168,16 @@
         files (get-gdrive-takeout-files gdrive-auth download-name)]
 
     (doseq [f (sort-by :name files)]
-      (with-retries
-        (let [file (java.io.File. (str target-path "/" (:name f)))]
-          (if (and (.exists file)
-                   (= (.length file)
-                      (long (bigdec (:quotaBytesUsed f)))))
-            (log/info "Skipping file already present locally:" (:id f))
-            (get-gdrive-file-by-id gdrive-auth (:id f) file)))
-        (trash-gdrive-file-by-id gdrive-auth (:id f))))))
+      (if (:trashed f)
+        (log/info "Skipping trashed file:" (:id f))
+        (with-retries
+          (let [file (java.io.File. (str target-path "/" (:name f)))]
+            (if (and (.exists file)
+                     (= (.length file)
+                        (long (bigdec (:quotaBytesUsed f)))))
+              (log/info "Skipping file already present locally:" (:id f))
+              (get-gdrive-file-by-id gdrive-auth (:id f) file)))
+          (trash-gdrive-file-by-id gdrive-auth (:id f)))))))
 
 ;;; Subcommand Maps
 
